@@ -1,12 +1,24 @@
+import os
 from pymongo import MongoClient
 from datetime import datetime
 
 # ==============================
-# CONNECT DATABASE
+# CONNECT DATABASE (RAILWAY ENV)
 # ==============================
-MONGO_URL = "YOUR_MONGO_URL_HERE"
+MONGO_URL = os.getenv("MONGO_URI")
+
+if not MONGO_URL:
+    raise Exception("❌ MONGO_URL is not set in environment variables")
 
 client = MongoClient(MONGO_URL)
+
+# TEST CONNECTION
+try:
+    client.server_info()
+    print("✅ MongoDB Connected Successfully")
+except Exception as e:
+    print("❌ MongoDB Connection Failed:", e)
+
 db = client["telegram_bot_system"]
 
 # ==============================
@@ -47,11 +59,17 @@ def add_bot(user_id, token, username, platform):
 def get_all_bots():
     return list(bots.find())
 
+def get_user_bots(user_id):
+    return list(bots.find({"user_id": user_id}))
+
 def remove_bot(user_id, username):
     return bots.delete_one({
         "user_id": user_id,
         "username": username
     })
+
+def get_bot_by_token(token):
+    return bots.find_one({"token": token})
 
 # ==============================
 # SETTINGS (SYSTEM CONTROL)
@@ -83,3 +101,13 @@ def get_platform_stats():
     return list(downloads.aggregate([
         {"$group": {"_id": "$platform", "count": {"$sum": 1}}}
     ]))
+
+# ==============================
+# HEALTH CHECK
+# ==============================
+def ping_db():
+    try:
+        client.admin.command("ping")
+        return True
+    except:
+        return False
