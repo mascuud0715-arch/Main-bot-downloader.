@@ -1,100 +1,85 @@
 from pymongo import MongoClient
-from config import MONGO_URI
+from datetime import datetime
 
 # ==============================
-# CONNECT DB
+# CONNECT DATABASE
 # ==============================
-client = MongoClient(MONGO_URI)
-db = client["bot_system"]
+MONGO_URL = "YOUR_MONGO_URL_HERE"
 
-bots_col = db["bots"]
-users_col = db["users"]
-stats_col = db["stats"]
-settings_col = db["settings"]
+client = MongoClient(MONGO_URL)
+db = client["telegram_bot_system"]
+
+# ==============================
+# COLLECTIONS
+# ==============================
+users = db["users"]
+bots = db["bots"]
+channels = db["channels"]
+settings = db["settings"]
+downloads = db["downloads"]
 
 # ==============================
 # USERS
 # ==============================
 def add_user(user_id):
-    try:
-        users_col.update_one(
-            {"user_id": user_id},
-            {"$set": {"user_id": user_id}},
-            upsert=True
-        )
-    except Exception as e:
-        print("DB USER ERROR:", e)
+    if not users.find_one({"user_id": user_id}):
+        users.insert_one({
+            "user_id": user_id,
+            "joined": datetime.utcnow()
+        })
 
-def get_users_count():
-    try:
-        return users_col.count_documents({})
-    except:
-        return 0
-
-# ==============================
-# DOWNLOAD STATS
-# ==============================
-def add_download(user_id, platform):
-    try:
-        stats_col.update_one(
-            {"platform": platform},
-            {"$inc": {"count": 1}},
-            upsert=True
-        )
-    except Exception as e:
-        print("DB DOWNLOAD ERROR:", e)
-
-def get_all_stats():
-    try:
-        return list(stats_col.find())
-    except:
-        return []
+def get_all_users():
+    return list(users.find())
 
 # ==============================
 # BOTS
 # ==============================
-def add_bot(token, platform):
-    try:
-        bots_col.update_one(
-            {"token": token},
-            {"$set": {
-                "token": token,
-                "platform": platform
-            }},
-            upsert=True
-        )
-    except Exception as e:
-        print("DB ADD BOT ERROR:", e)
+def add_bot(user_id, token, username, platform):
+    if not bots.find_one({"token": token}):
+        bots.insert_one({
+            "user_id": user_id,
+            "token": token,
+            "username": username,
+            "platform": platform,
+            "created_at": datetime.utcnow()
+        })
 
 def get_all_bots():
-    try:
-        return list(bots_col.find())
-    except Exception as e:
-        print("DB GET BOTS ERROR:", e)
-        return []
+    return list(bots.find())
 
-def delete_bot(token):
-    try:
-        bots_col.delete_one({"token": token})
-    except Exception as e:
-        print("DB DELETE BOT ERROR:", e)
+def remove_bot(user_id, username):
+    return bots.delete_one({
+        "user_id": user_id,
+        "username": username
+    })
 
 # ==============================
-# SETTINGS
+# SETTINGS (SYSTEM CONTROL)
 # ==============================
 def set_setting(key, value):
-    try:
-        settings_col.update_one(
-            {"key": key},
-            {"$set": {"value": value}},
-            upsert=True
-        )
-    except Exception as e:
-        print("DB SETTING ERROR:", e)
+    settings.update_one(
+        {"key": key},
+        {"$set": {"value": value}},
+        upsert=True
+    )
 
 def get_setting(key):
-    try:
-        s = settings_col.find_one({"key": key})
-        return s["value"] if s else "ON"
-    except:
-        return "ON"
+    s = settings.find_one({"key": key})
+    return s["value"] if s else None
+
+# ==============================
+# DOWNLOAD TRACKING
+# ==============================
+def add_download(platform):
+    downloads.insert_one({
+        "platform": platform,
+        "time": datetime.utcnow()
+    })
+
+def get_download_count():
+    return downloads.count_documents({})
+
+def get_platform_stats():
+    return list(downloads.aggregate([
+        {"$group": {"_id": "$platform", "count": {"$sum": 1}}}
+    ]))
