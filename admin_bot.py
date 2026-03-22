@@ -1,5 +1,6 @@
 import telebot
 from telebot.types import ReplyKeyboardMarkup
+from database import get_all_users_global
 from config import ADMIN_BOT_TOKEN, ADMIN_ID
 from database import (
     set_setting,
@@ -106,27 +107,21 @@ def broadcast_start(message):
 def process_broadcast(message):
     if not is_admin(message.chat.id): return
 
-    users = get_all_users()
+    users = get_all_users_global()
     success = 0
     fail = 0
 
-    for user in users:
-        uid = user.get("user_id")
-
+    for uid in users:
         try:
-            # TEXT
             if message.text:
                 bot.send_message(uid, message.text)
 
-            # PHOTO
             elif message.photo:
                 bot.send_photo(uid, message.photo[-1].file_id, caption=message.caption)
 
-            # VIDEO
             elif message.video:
                 bot.send_video(uid, message.video.file_id, caption=message.caption)
 
-            # FORWARD
             else:
                 bot.forward_message(uid, message.chat.id, message.message_id)
 
