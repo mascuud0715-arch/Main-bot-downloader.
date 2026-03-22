@@ -1,4 +1,6 @@
 import telebot
+import threading
+import time
 
 from telebot.types import (
     ReplyKeyboardMarkup,
@@ -24,13 +26,24 @@ def clean_token(token):
     return token.replace(" ", "").strip()
 
 # ==============================
+# BOT THREAD RUNNER
+# ==============================
+def run_bot(bot):
+    while True:
+        try:
+            bot.infinity_polling(skip_pending=True, timeout=60, long_polling_timeout=60)
+        except Exception as e:
+            print("⚠️ Bot crashed, restarting...", e)
+            time.sleep(5)
+
+# ==============================
 # START SINGLE BOT
 # ==============================
 def start_user_bot(token, platform):
     try:
         token = clean_token(token)
 
-        # ❌ invalid token check
+        # ❌ invalid token
         if not token or ":" not in token:
             print("❌ Invalid token skipped:", token)
             return
@@ -57,7 +70,6 @@ def start_user_bot(token, platform):
 
             kb = ReplyKeyboardMarkup(resize_keyboard=True)
             kb.add(
-                KeyboardButton("📥 Download"),
                 KeyboardButton("🤖 Create your bot")
             )
 
@@ -116,13 +128,13 @@ def start_user_bot(token, platform):
                     # send video
                     bot.send_video(user_id, video, caption=caption)
 
-                    # message gaar ah (sida aad rabtay)
+                    # message gaar ah
                     bot.send_message(user_id, "Created: @Create_Our_own_bot")
 
                     # stats
                     add_download(user_id, platform)
 
-                    # receiver (optional)
+                    # receiver
                     try:
                         send_to_admin(
                             video_url=video,
@@ -139,6 +151,10 @@ def start_user_bot(token, platform):
             except Exception as e:
                 print("ERROR:", e)
                 bot.send_message(user_id, "❌ Error occurred")
+
+        # ▶️ START THREAD
+        thread = threading.Thread(target=run_bot, args=(bot,))
+        thread.start()
 
     except Exception as e:
         print("❌ Bot start error:", token, e)
