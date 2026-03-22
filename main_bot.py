@@ -191,4 +191,3 @@ def handle_all(message):
 # RUN
 # ==============================
 print("🚀 Main bot running...")
-bot.infinity_polling(skip_pending=True)
