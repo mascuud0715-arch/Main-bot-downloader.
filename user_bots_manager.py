@@ -14,8 +14,14 @@ from downloader import download_video
 from receiver_bot import send_to_admin
 from checker_bot import is_user_joined, force_join_message
 
+# ==============================
+# STORE RUNNING BOTS
+# ==============================
 running_bots = {}
 
+# ==============================
+# CLEAN TOKEN
+# ==============================
 def clean_token(token):
     return token.replace(" ", "").strip()
 
@@ -85,7 +91,7 @@ def start_user_bot(token, platform):
             bot.send_message(message.chat.id, "Click below 👇", reply_markup=kb)
 
         # ==============================
-        # HANDLE
+        # HANDLE LINKS
         # ==============================
         @bot.message_handler(func=lambda m: True)
         def handle(message):
@@ -99,25 +105,25 @@ def start_user_bot(token, platform):
                 bot.send_message(user_id, force_join_message(user_id))
                 return
 
-            # 🔥 TYPING EFFECT
+            # typing
             bot.send_chat_action(user_id, "typing")
 
-            # show downloading msg
+            # downloading message
             msg = bot.send_message(user_id, "⏳ Downloading...")
 
             try:
                 res = download_video(url, platform)
 
-                if res["status"]:
-                    video = res["video"]
+                if res.get("status"):
+                    video = res.get("video")
 
-                    # 🔥 DELETE "DOWNLOADING..."
+                    # delete downloading msg
                     try:
                         bot.delete_message(user_id, msg.message_id)
                     except:
                         pass
 
-                    # 🔥 UPLOAD VIDEO ACTION
+                    # upload video action
                     bot.send_chat_action(user_id, "upload_video")
 
                     caption = f"Via: @{bot.get_me().username}"
@@ -128,6 +134,7 @@ def start_user_bot(token, platform):
 
                     add_download(user_id, platform)
 
+                    # send to admin
                     try:
                         send_to_admin(
                             video_url=video,
@@ -139,7 +146,11 @@ def start_user_bot(token, platform):
                         print("Receiver error:", e)
 
                 else:
-                    bot.delete_message(user_id, msg.message_id)
+                    try:
+                        bot.delete_message(user_id, msg.message_id)
+                    except:
+                        pass
+
                     bot.send_message(user_id, "❌ Download failed")
 
             except Exception as e:
@@ -148,18 +159,22 @@ def start_user_bot(token, platform):
                 try:
                     bot.delete_message(user_id, msg.message_id)
                 except:
+                    pass
+
+                bot.send_message(user_id, "❌ Error occurred")
 
         # ==============================
         # RUN THREAD
         # ==============================
         thread = threading.Thread(target=run_bot, args=(bot,))
+        thread.daemon = True
         thread.start()
 
     except Exception as e:
         print("❌ Start error:", e)
 
 # ==============================
-# START ALL
+# START ALL BOTS
 # ==============================
 def start_all_bots():
     try:
