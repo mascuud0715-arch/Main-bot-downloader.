@@ -46,5 +46,3 @@ def run_receiver():
         bot.remove_webhook()
     except:
         pass
-
-    bot.infinity_polling(skip_pending=True)
