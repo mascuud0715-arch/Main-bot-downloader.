@@ -1,24 +1,50 @@
 import threading
-import os
+import time
 
-def run_main():
-    os.system("python main_bot.py")
+# import bots
+from main_bot import bot as main_bot
+from admin_bot import bot as admin_bot
+from receiver_bot import bot as receiver_bot
+from checker_bot import bot as checker_bot
 
-def run_admin():
-    os.system("python admin_bot.py")
+# import user bots manager
+from user_bots_manager import start_all_bots
 
-def run_receiver():
-    os.system("python receiver_bot.py")
+# ==============================
+# RUN FUNCTION
+# ==============================
+def run_bot(bot_instance, name):
+    print(f"🚀 {name} started")
+    while True:
+        try:
+            bot_instance.infinity_polling(timeout=30, long_polling_timeout=10)
+        except Exception as e:
+            print(f"❌ {name} crashed: {e}")
+            time.sleep(5)
 
+# ==============================
+# START SYSTEM
+# ==============================
 if __name__ == "__main__":
-    t1 = threading.Thread(target=run_main)
-    t2 = threading.Thread(target=run_admin)
-    t3 = threading.Thread(target=run_receiver)
+    print("🔥 Starting FULL BOT SYSTEM...")
 
-    t1.start()
-    t2.start()
-    t3.start()
+    # 🔥 START USER BOTS
+    start_all_bots()
 
-    t1.join()
-    t2.join()
-    t3.join()
+    # ==========================
+    # THREADS
+    # ==========================
+    threads = []
+
+    threads.append(threading.Thread(target=run_bot, args=(main_bot, "Main Bot")))
+    threads.append(threading.Thread(target=run_bot, args=(admin_bot, "Admin Bot")))
+    threads.append(threading.Thread(target=run_bot, args=(receiver_bot, "Receiver Bot")))
+    threads.append(threading.Thread(target=run_bot, args=(checker_bot, "Checker Bot")))
+
+    # START ALL
+    for t in threads:
+        t.start()
+
+    # KEEP ALIVE
+    for t in threads:
+        t.join()
