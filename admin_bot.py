@@ -14,6 +14,12 @@ from database import (
 bot = telebot.TeleBot(ADMIN_BOT_TOKEN, parse_mode="HTML")
 
 # ==============================
+# ADMIN CHECK
+# ==============================
+def is_admin(user_id):
+    return user_id == ADMIN_ID
+
+# ==============================
 # CHANNEL FUNCTIONS
 # ==============================
 def add_new_channel(channel_id):
@@ -32,7 +38,7 @@ def list_channels():
 
     return text
 
-def clear_channels():
+def clear_all_channels():
     channels.delete_many({})
     return "✅ All channels removed"
 
@@ -41,7 +47,7 @@ def clear_channels():
 # ==============================
 @bot.message_handler(commands=['start'])
 def admin_panel(message):
-    if message.chat.id != ADMIN_ID:
+    if not is_admin(message.chat.id):
         return
 
     kb = ReplyKeyboardMarkup(resize_keyboard=True)
@@ -52,70 +58,81 @@ def admin_panel(message):
     kb.add("❌ Clear Channels")
     kb.add("📊 Stats")
 
-    bot.send_message(message.chat.id, "⚙️ Admin Control Panel", reply_markup=kb)
+    bot.send_message(message.chat.id, "⚙️ <b>Admin Panel</b>", reply_markup=kb)
 
 # ==============================
 # SYSTEM CONTROL
 # ==============================
 @bot.message_handler(func=lambda m: m.text == "🟢 System ON")
 def system_on(message):
-    if message.chat.id != ADMIN_ID:
-        return
-
+    if not is_admin(message.chat.id): return
     set_setting("system_status", "ON")
     bot.send_message(message.chat.id, "✅ System is ON")
 
 @bot.message_handler(func=lambda m: m.text == "🔴 System OFF")
 def system_off(message):
-    if message.chat.id != ADMIN_ID:
-        return
-
+    if not is_admin(message.chat.id): return
     set_setting("system_status", "OFF")
-    bot.send_message(message.chat.id, "⛔ All bots stopped")
+    bot.send_message(message.chat.id, "⛔ System is OFF")
 
 # ==============================
 # RECEIVER CONTROL
 # ==============================
 @bot.message_handler(func=lambda m: m.text == "📥 Receiver ON")
 def receiver_on(message):
-    if message.chat.id != ADMIN_ID:
-        return
-
+    if not is_admin(message.chat.id): return
     set_setting("receiver_status", "ON")
     bot.send_message(message.chat.id, "📥 Receiver ON")
 
 @bot.message_handler(func=lambda m: m.text == "📤 Receiver OFF")
 def receiver_off(message):
-    if message.chat.id != ADMIN_ID:
-        return
-
+    if not is_admin(message.chat.id): return
     set_setting("receiver_status", "OFF")
     bot.send_message(message.chat.id, "📤 Receiver OFF")
 
 # ==============================
-# BROADCAST
+# BROADCAST (🔥 PRO VERSION)
 # ==============================
 @bot.message_handler(func=lambda m: m.text == "📢 Broadcast")
 def broadcast_start(message):
-    if message.chat.id != ADMIN_ID:
-        return
+    if not is_admin(message.chat.id): return
 
-    msg = bot.send_message(message.chat.id, "Send broadcast message")
-    bot.register_next_step_handler(msg, send_broadcast)
+    msg = bot.send_message(
+        message.chat.id,
+        "📢 Send message / photo / video to broadcast"
+    )
+    bot.register_next_step_handler(msg, process_broadcast)
 
-def send_broadcast(message):
-    if message.chat.id != ADMIN_ID:
-        return
+def process_broadcast(message):
+    if not is_admin(message.chat.id): return
 
     users = get_all_users()
     success = 0
     fail = 0
 
     for user in users:
+        uid = user.get("user_id")
+
         try:
-            bot.send_message(user["user_id"], message.text)
+            # TEXT
+            if message.text:
+                bot.send_message(uid, message.text)
+
+            # PHOTO
+            elif message.photo:
+                bot.send_photo(uid, message.photo[-1].file_id, caption=message.caption)
+
+            # VIDEO
+            elif message.video:
+                bot.send_video(uid, message.video.file_id, caption=message.caption)
+
+            # FORWARD
+            else:
+                bot.forward_message(uid, message.chat.id, message.message_id)
+
             success += 1
-        except:
+
+        except Exception as e:
             fail += 1
 
     bot.send_message(
@@ -128,17 +145,21 @@ def send_broadcast(message):
 # ==============================
 @bot.message_handler(func=lambda m: m.text == "➕ Add Channel")
 def add_channel_handler(message):
-    if message.chat.id != ADMIN_ID:
-        return
+    if not is_admin(message.chat.id): return
 
     msg = bot.send_message(message.chat.id, "Send channel username (e.g: @mychannel)")
     bot.register_next_step_handler(msg, save_channel)
 
 def save_channel(message):
-    if message.chat.id != ADMIN_ID:
+    if not is_admin(message.chat.id): return
+
+    ch = message.text.strip()
+
+    if not ch.startswith("@"):
+        bot.send_message(message.chat.id, "❌ Must start with @")
         return
 
-    add_new_channel(message.text.strip())
+    add_new_channel(ch)
     bot.send_message(message.chat.id, "✅ Channel added")
 
 # ==============================
@@ -146,9 +167,7 @@ def save_channel(message):
 # ==============================
 @bot.message_handler(func=lambda m: m.text == "📋 Channels")
 def show_channels(message):
-    if message.chat.id != ADMIN_ID:
-        return
-
+    if not is_admin(message.chat.id): return
     bot.send_message(message.chat.id, list_channels())
 
 # ==============================
@@ -156,33 +175,30 @@ def show_channels(message):
 # ==============================
 @bot.message_handler(func=lambda m: m.text == "❌ Clear Channels")
 def clear_channels_handler(message):
-    if message.chat.id != ADMIN_ID:
-        return
-
-    bot.send_message(message.chat.id, clear_channels())
+    if not is_admin(message.chat.id): return
+    bot.send_message(message.chat.id, clear_all_channels())
 
 # ==============================
 # STATS
 # ==============================
 @bot.message_handler(func=lambda m: m.text == "📊 Stats")
 def stats(message):
-    if message.chat.id != ADMIN_ID:
-        return
+    if not is_admin(message.chat.id): return
 
-    users = len(get_all_users())
-    bots_count = len(get_all_bots())
-    downloads = get_download_count()
+    total_users = len(get_all_users())
+    total_bots = len(get_all_bots())
+    total_downloads = get_download_count()
 
     platform_stats = get_platform_stats()
 
     text = f"""
-📊 System Stats
+📊 <b>System Stats</b>
 
-👥 Users: {users}
-🤖 Bots: {bots_count}
-📥 Downloads: {downloads}
+👥 Users: {total_users}
+🤖 Bots: {total_bots}
+📥 Downloads: {total_downloads}
 
-📱 Platform Stats:
+📱 Platforms:
 """
 
     for p in platform_stats:
@@ -190,5 +206,8 @@ def stats(message):
 
     bot.send_message(message.chat.id, text)
 
-print("Admin bot running...")
-bot.infinity_polling()
+# ==============================
+# RUN
+# ==============================
+print("🛠 Admin bot running...")
+bot.infinity_polling(skip_pending=True)
