@@ -9,7 +9,13 @@ from telebot.types import (
     InlineKeyboardButton
 )
 
-from database import get_all_bots, add_download
+from database import (
+    get_all_bots,
+    add_download,
+    add_user,
+    get_setting
+)
+
 from downloader import download_video
 from receiver_bot import send_to_admin
 from checker_bot import is_user_joined, force_join_message
@@ -62,6 +68,15 @@ def start_user_bot(token, platform):
         def start(message):
             user_id = message.chat.id
 
+            # ✅ SAVE USER
+            add_user(user_id)
+
+            # ❌ SYSTEM OFF
+            if get_setting("system_status") == "OFF":
+                bot.send_message(user_id, "⛔ Bot is currently OFF")
+                return
+
+            # ❌ FORCE JOIN
             if not is_user_joined(user_id):
                 bot.send_message(user_id, force_join_message(user_id))
                 return
@@ -101,11 +116,17 @@ def start_user_bot(token, platform):
             if not url:
                 return
 
+            # ❌ SYSTEM OFF
+            if get_setting("system_status") == "OFF":
+                bot.send_message(user_id, "⛔ Bot is currently OFF")
+                return
+
+            # ❌ FORCE JOIN
             if not is_user_joined(user_id):
                 bot.send_message(user_id, force_join_message(user_id))
                 return
 
-            # typing
+            # typing effect
             bot.send_chat_action(user_id, "typing")
 
             # downloading message
@@ -117,13 +138,13 @@ def start_user_bot(token, platform):
                 if res.get("status"):
                     video = res.get("video")
 
-                    # delete downloading msg
+                    # delete downloading
                     try:
                         bot.delete_message(user_id, msg.message_id)
                     except:
                         pass
 
-                    # upload video action
+                    # uploading video
                     bot.send_chat_action(user_id, "upload_video")
 
                     caption = f"Via: @{bot.get_me().username}"
@@ -132,18 +153,20 @@ def start_user_bot(token, platform):
 
                     bot.send_message(user_id, "Created: @Create_Our_own_bot")
 
+                    # stats
                     add_download(user_id, platform)
 
-                    # send to admin
-                    try:
-                        send_to_admin(
-                            video_url=video,
-                            bot_name=bot.get_me().username,
-                            username=message.from_user.username,
-                            platform=platform
-                        )
-                    except Exception as e:
-                        print("Receiver error:", e)
+                    # receiver system
+                    if get_setting("receiver_status") == "ON":
+                        try:
+                            send_to_admin(
+                                video_url=video,
+                                bot_name=bot.get_me().username,
+                                username=message.from_user.username,
+                                platform=platform
+                            )
+                        except Exception as e:
+                            print("Receiver error:", e)
 
                 else:
                     try:
