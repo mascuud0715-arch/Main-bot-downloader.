@@ -14,13 +14,17 @@ from downloader import download_video
 from receiver_bot import send_to_admin
 from checker_bot import is_user_joined, force_join_message
 
+# 🔥 tracking bots
 running_bots = {}
 
+# ==============================
+# CLEAN TOKEN
+# ==============================
 def clean_token(token):
     return token.replace(" ", "").strip()
 
 # ==============================
-# BOT THREAD
+# BOT THREAD (AUTO RESTART)
 # ==============================
 def run_bot(bot):
     while True:
@@ -31,7 +35,7 @@ def run_bot(bot):
             time.sleep(5)
 
 # ==============================
-# START BOT
+# START SINGLE BOT
 # ==============================
 def start_user_bot(token, platform):
     try:
@@ -41,22 +45,23 @@ def start_user_bot(token, platform):
             print("❌ Invalid token:", token)
             return
 
+        # 🔥 avoid duplicate start
         if token in running_bots:
             return
 
         bot = telebot.TeleBot(token, parse_mode="HTML")
         running_bots[token] = bot
 
-        print(f"✅ Bot started: {token[:10]}")
+        print(f"🚀 Bot started: {token[:10]}")
 
         # ==============================
-        # START
+        # START COMMAND
         # ==============================
         @bot.message_handler(commands=['start'])
         def start(message):
             user_id = message.chat.id
 
-            # 🔥 SAVE USER + BOT (MUHIIM)
+            # 🔥 SAVE USER + BOT
             save_user_bot(user_id, token)
 
             if not is_user_joined(user_id):
@@ -73,7 +78,7 @@ def start_user_bot(token, platform):
             )
 
         # ==============================
-        # CREATE BOT
+        # CREATE BOT BUTTON
         # ==============================
         @bot.message_handler(func=lambda m: m.text == "🤖 Create your bot")
         def create_bot(message):
@@ -88,7 +93,7 @@ def start_user_bot(token, platform):
             bot.send_message(message.chat.id, "Click below 👇", reply_markup=kb)
 
         # ==============================
-        # HANDLE
+        # HANDLE ALL MESSAGES
         # ==============================
         @bot.message_handler(func=lambda m: True)
         def handle(message):
@@ -98,7 +103,7 @@ def start_user_bot(token, platform):
             if not url:
                 return
 
-            # 🔥 SAVE USER AGAIN (safety)
+            # 🔥 SAVE USER AGAIN
             save_user_bot(user_id, token)
 
             if not is_user_joined(user_id):
@@ -111,9 +116,10 @@ def start_user_bot(token, platform):
             try:
                 res = download_video(url, platform)
 
-                if res["status"]:
-                    video = res["video"]
+                if res.get("status"):
+                    video = res.get("video")
 
+                    # delete loading msg
                     try:
                         bot.delete_message(user_id, msg.message_id)
                     except:
@@ -126,9 +132,10 @@ def start_user_bot(token, platform):
 
                     bot.send_message(user_id, "Created: @Create_Our_own_bot")
 
-                    # 🔥 FIXED
+                    # 🔥 download stats
                     add_download(platform)
 
+                    # 🔥 send to admin
                     try:
                         send_to_admin(
                             video_url=video,
@@ -154,7 +161,7 @@ def start_user_bot(token, platform):
                 bot.send_message(user_id, "❌ Error occurred")
 
         # ==============================
-        # RUN THREAD
+        # START THREAD
         # ==============================
         thread = threading.Thread(target=run_bot, args=(bot,), daemon=True)
         thread.start()
@@ -163,11 +170,13 @@ def start_user_bot(token, platform):
         print("❌ Start error:", e)
 
 # ==============================
-# START ALL
+# START ALL BOTS
 # ==============================
 def start_all_bots():
     try:
         all_bots = get_all_bots()
+
+        print(f"🤖 Loading {len(all_bots)} bots...")
 
         for b in all_bots:
             token = b.get("token")
@@ -178,5 +187,3 @@ def start_all_bots():
 
     except Exception as e:
         print("❌ Load error:", e)
-
-bot.infinity_polling()
