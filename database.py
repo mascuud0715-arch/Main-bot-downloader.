@@ -3,16 +3,15 @@ from pymongo import MongoClient
 from datetime import datetime
 
 # ==============================
-# CONNECT DATABASE (RAILWAY ENV)
+# CONNECT DATABASE
 # ==============================
 MONGO_URL = os.getenv("MONGO_URI")
 
 if not MONGO_URL:
-    raise Exception("❌ MONGO_URL is not set in environment variables")
+    raise Exception("❌ MONGO_URI is not set")
 
 client = MongoClient(MONGO_URL)
 
-# TEST CONNECTION
 try:
     client.server_info()
     print("✅ MongoDB Connected Successfully")
@@ -34,28 +33,55 @@ downloads = db["downloads"]
 # USERS
 # ==============================
 def add_user(user_id):
-    if not users.find_one({"user_id": user_id}):
-        users.insert_one({
-            "user_id": user_id,
-            "joined": datetime.utcnow()
-        })
+    users.update_one(
+        {"user_id": user_id},
+        {
+            "$setOnInsert": {
+                "joined": datetime.utcnow()
+            }
+        },
+        upsert=True
+    )
+
+# 🔥 SAVE USER + BOT (MUHIIM)
+def save_user_bot(user_id, bot_token):
+    users.update_one(
+        {"user_id": user_id},
+        {
+            "$set": {
+                "bot_token": bot_token,
+                "last_seen": datetime.utcnow()
+            },
+            "$setOnInsert": {
+                "joined": datetime.utcnow()
+            }
+        },
+        upsert=True
+    )
 
 def get_all_users():
     return list(users.find())
 
 def get_all_users_global():
-    user_ids = set()
+    return [u.get("user_id") for u in users.find() if u.get("user_id")]
 
-    # users collection
+# 🔥 CORE: USERS GROUPED BY BOT (BROADCAST)
+def get_users_by_bot():
+    data = {}
+
     for u in users.find():
-        user_ids.add(u.get("user_id"))
+        token = u.get("bot_token")
+        uid = u.get("user_id")
 
-    # bots collection (haddii user bots leeyihiin users)
-    for b in bots.find():
-        if "user_id" in b:
-            user_ids.add(b.get("user_id"))
+        if not token or not uid:
+            continue
 
-    return list(user_ids)
+        if token not in data:
+            data[token] = []
+
+        data[token].append(uid)
+
+    return data
 
 # ==============================
 # BOTS
@@ -86,7 +112,23 @@ def get_bot_by_token(token):
     return bots.find_one({"token": token})
 
 # ==============================
-# SETTINGS (SYSTEM CONTROL)
+# CHANNELS
+# ==============================
+def add_channel(channel_id):
+    if not channels.find_one({"channel_id": channel_id}):
+        channels.insert_one({
+            "channel_id": channel_id,
+            "added_at": datetime.utcnow()
+        })
+
+def get_channels():
+    return [c.get("channel_id") for c in channels.find()]
+
+def clear_channels():
+    channels.delete_many({})
+
+# ==============================
+# SETTINGS
 # ==============================
 def set_setting(key, value):
     settings.update_one(
