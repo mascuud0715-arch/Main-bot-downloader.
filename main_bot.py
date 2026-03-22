@@ -54,14 +54,28 @@ def add_bot(message):
 def show_bots(message):
     user_bots = list(bots.find({"user_id": message.chat.id}))
 
+    # haddii waxba jirin
     if not user_bots:
-        bot.send_message(message.chat.id, "❌ You have no bots")
+        bot.send_message(message.chat.id, "❌ You don't have any bots")
         return
 
     text = "🤖 Your Bots:\n\n"
+    count = 0
 
-    for i, b in enumerate(user_bots, start=1):
-        text += f"{i}. @{b.get('username')} ({b.get('platform')})\n"
+    for b in user_bots:
+        username = b.get("username")
+
+        # skip haddii username khaldan yahay
+        if not username or username == "None":
+            continue
+
+        count += 1
+        text += f"{count}. @{username} ({b.get('platform')})\n"
+
+    # haddii dhammaan ay khaldan yihiin
+    if count == 0:
+        bot.send_message(message.chat.id, "❌ You don't have any bots")
+        return
 
     bot.send_message(message.chat.id, text)
 
