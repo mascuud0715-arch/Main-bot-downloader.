@@ -22,7 +22,25 @@ def start(message):
 
     bot.send_message(
         message.chat.id,
-        "👋 Ku soo dhawoow Bot Builder\n\nDooro waxa aad rabto:",
+"""🤖 Welcome to Bot System
+
+You can connect your own Telegram bot and turn it into a **TikTok downloader**.
+
+📥 Features your bot will have:
+
+• Download TikTok videos  
+• Download TikTok photo slides  
+• Work automatically for users  
+• Ultra fast downloads  
+
+⚙️ Setup Steps
+
+1️⃣ Create bot via @BotFather  
+2️⃣ Copy Bot Token  
+3️⃣ Click ➕ Add Bot  
+4️⃣ Send token  
+
+🚀 Your bot will start automatically.""",
         reply_markup=kb
     )
 
