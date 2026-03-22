@@ -1,9 +1,9 @@
 import telebot
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton
-
 from config import MAIN_BOT_TOKEN
 from database import bots
 
+# 🔥 muhiim
 from user_bots_manager import start_user_bot
 
 bot = telebot.TeleBot(MAIN_BOT_TOKEN, parse_mode="HTML")
@@ -11,9 +11,10 @@ bot = telebot.TeleBot(MAIN_BOT_TOKEN, parse_mode="HTML")
 user_step = {}
 
 # ==============================
-# MENU FUNCTION (IMPORTANT)
+# START
 # ==============================
-def main_menu(user_id):
+@bot.message_handler(commands=['start'])
+def start(message):
     kb = ReplyKeyboardMarkup(resize_keyboard=True)
     kb.add(
         KeyboardButton("➕ ADD BOT"),
@@ -22,7 +23,7 @@ def main_menu(user_id):
     )
 
     bot.send_message(
-        user_id,
+        message.chat.id,
 """🤖 Welcome to Bot System
 
 Connect your own bot and turn it into a downloader.
@@ -42,18 +43,11 @@ Connect your own bot and turn it into a downloader.
     )
 
 # ==============================
-# START
-# ==============================
-@bot.message_handler(commands=['start'])
-def start(message):
-    main_menu(message.chat.id)
-
-# ==============================
 # ADD BOT
 # ==============================
 @bot.message_handler(func=lambda m: m.text == "➕ ADD BOT")
 def add_bot(message):
-    bot.send_message(message.chat.id, "📥 Send your BOT TOKEN From @BotFather:")
+    bot.send_message(message.chat.id, "📥 Send your BOT TOKEN:")
     user_step[message.chat.id] = "waiting_token"
 
 # ==============================
@@ -104,11 +98,7 @@ def handle_all(message):
     # STEP 1: TOKEN
     # ======================
     if step == "waiting_token":
-        token = message.text.replace(" ", "").strip()
-
-        if ":" not in token:
-            bot.send_message(message.chat.id, "❌ Invalid token format")
-            return
+        token = message.text.strip()
 
         try:
             test_bot = telebot.TeleBot(token)
@@ -131,8 +121,7 @@ def handle_all(message):
                 reply_markup=kb
             )
 
-        except Exception as e:
-            print("Token error:", e)
+        except:
             bot.send_message(message.chat.id, "❌ Invalid token, try again")
 
     # ======================
@@ -147,18 +136,11 @@ def handle_all(message):
             bot.send_message(message.chat.id, "❌ Choose valid platform")
             return
 
-        # ❌ duplicate check
-        existing = bots.find_one({
-            "$or": [
-                {"token": token},
-                {"username": username}
-            ]
-        })
-
+        # ❌ check duplicate
+        existing = bots.find_one({"token": token})
         if existing:
             bot.send_message(message.chat.id, "⚠️ This bot already exists")
             user_step[message.chat.id] = None
-            main_menu(message.chat.id)
             return
 
         # ✅ SAVE
@@ -169,7 +151,7 @@ def handle_all(message):
             "username": username
         })
 
-        # 🔥 START BOT
+        # 🔥 START BOT INSTANTLY
         start_user_bot(token, platform)
 
         bot.send_message(
@@ -183,9 +165,6 @@ def handle_all(message):
         )
 
         user_step[message.chat.id] = None
-
-        # 🔥 KU CELI MENU (SIDII AAD RABTAY)
-        main_menu(message.chat.id)
 
     # ======================
     # REMOVE BOT STEP
@@ -205,12 +184,8 @@ def handle_all(message):
 
         user_step[message.chat.id] = None
 
-        # 🔥 KU CELI MENU
-        main_menu(message.chat.id)
-
 
 # ==============================
 # RUN
 # ==============================
 print("🚀 Main bot running...")
-bot.infinity_polling(skip_pending=True)
