@@ -6,6 +6,7 @@ import os
 MAIN_BOT_TOKEN = os.getenv("MAIN_BOT_TOKEN")
 ADMIN_BOT_TOKEN = os.getenv("ADMIN_BOT_TOKEN")
 RECEIVER_BOT_TOKEN = os.getenv("RECEIVER_BOT_TOKEN")
+CHECKER_BOT_TOKEN = os.getenv("CHECKER_BOT_TOKEN")
 
 # ==============================
 # ADMIN
@@ -31,6 +32,9 @@ if not RECEIVER_BOT_TOKEN:
 
 if not MONGO_URI:
     raise Exception("MONGO_URI is missing")
+
+if not CHECKER_BOT_TOKEN:
+    raise Exception("CHECKER_BOT_TOKEN is missing")
 
 if ADMIN_ID == 0:
     raise Exception("ADMIN_ID is missing or invalid")
