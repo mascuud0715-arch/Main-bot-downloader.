@@ -40,9 +40,3 @@ Created: @Create_Our_own_bot
 def test(message):
     if message.chat.id == ADMIN_ID:
         bot.send_message(message.chat.id, "✅ Receiver bot is working")
-
-# ==============================
-# RUN
-# ==============================
-print("Receiver bot running...")
-bot.infinity_polling()
