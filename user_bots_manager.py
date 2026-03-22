@@ -148,9 +148,6 @@ def start_user_bot(token, platform):
                 try:
                     bot.delete_message(user_id, msg.message_id)
                 except:
-                    pass
-
-                bot.send_message(user_id, "❌ Error occurred")
 
         # ==============================
         # RUN THREAD
