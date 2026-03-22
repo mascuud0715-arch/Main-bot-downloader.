@@ -178,3 +178,5 @@ def start_all_bots():
 
     except Exception as e:
         print("❌ Load error:", e)
+
+bot.infinity_polling()
