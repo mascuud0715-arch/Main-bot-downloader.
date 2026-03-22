@@ -14,7 +14,7 @@ from database import (
 bot = telebot.TeleBot(ADMIN_BOT_TOKEN, parse_mode="HTML")
 
 # ==============================
-# CHANNEL FUNCTIONS (INTEGRATED)
+# CHANNEL FUNCTIONS
 # ==============================
 def add_new_channel(channel_id):
     if not channels.find_one({"channel_id": channel_id}):
@@ -47,6 +47,7 @@ def admin_panel(message):
     kb = ReplyKeyboardMarkup(resize_keyboard=True)
     kb.add("🟢 System ON", "🔴 System OFF")
     kb.add("📥 Receiver ON", "📤 Receiver OFF")
+    kb.add("📢 Broadcast")
     kb.add("➕ Add Channel", "📋 Channels")
     kb.add("❌ Clear Channels")
     kb.add("📊 Stats")
@@ -70,7 +71,7 @@ def system_off(message):
         return
 
     set_setting("system_status", "OFF")
-    bot.send_message(message.chat.id, "⛔ System is OFF")
+    bot.send_message(message.chat.id, "⛔ All bots stopped")
 
 # ==============================
 # RECEIVER CONTROL
@@ -92,6 +93,37 @@ def receiver_off(message):
     bot.send_message(message.chat.id, "📤 Receiver OFF")
 
 # ==============================
+# BROADCAST
+# ==============================
+@bot.message_handler(func=lambda m: m.text == "📢 Broadcast")
+def broadcast_start(message):
+    if message.chat.id != ADMIN_ID:
+        return
+
+    msg = bot.send_message(message.chat.id, "Send broadcast message")
+    bot.register_next_step_handler(msg, send_broadcast)
+
+def send_broadcast(message):
+    if message.chat.id != ADMIN_ID:
+        return
+
+    users = get_all_users()
+    success = 0
+    fail = 0
+
+    for user in users:
+        try:
+            bot.send_message(user["user_id"], message.text)
+            success += 1
+        except:
+            fail += 1
+
+    bot.send_message(
+        message.chat.id,
+        f"✅ Sent: {success}\n❌ Failed: {fail}"
+    )
+
+# ==============================
 # ADD CHANNEL
 # ==============================
 @bot.message_handler(func=lambda m: m.text == "➕ Add Channel")
@@ -99,20 +131,18 @@ def add_channel_handler(message):
     if message.chat.id != ADMIN_ID:
         return
 
-    bot.send_message(message.chat.id, "Send channel username (e.g: @mychannel)")
-    bot.register_next_step_handler(message, save_channel)
+    msg = bot.send_message(message.chat.id, "Send channel username (e.g: @mychannel)")
+    bot.register_next_step_handler(msg, save_channel)
 
 def save_channel(message):
     if message.chat.id != ADMIN_ID:
         return
 
-    channel_id = message.text.strip()
-    add_new_channel(channel_id)
-
+    add_new_channel(message.text.strip())
     bot.send_message(message.chat.id, "✅ Channel added")
 
 # ==============================
-# SHOW CHANNELS
+# CHANNELS
 # ==============================
 @bot.message_handler(func=lambda m: m.text == "📋 Channels")
 def show_channels(message):
@@ -160,7 +190,5 @@ def stats(message):
 
     bot.send_message(message.chat.id, text)
 
-# ==============================
-# RUN
-# ==============================
 print("Admin bot running...")
+bot.infinity_polling()
