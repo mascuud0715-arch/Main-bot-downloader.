@@ -19,12 +19,6 @@ MONGO_URI = os.getenv("MONGO_URI")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 
 # ==============================
-# SYSTEM CONTROL
-# ==============================
-SYSTEM_STATUS = os.getenv("SYSTEM_STATUS", "ON")  # ON / OFF
-RECEIVER_STATUS = os.getenv("RECEIVER_STATUS", "OFF")  # ON / OFF
-
-# ==============================
 # DEFAULT SETTINGS
 # ==============================
 DEFAULT_CAPTION = "Created: @Create_Our_own_bot"
