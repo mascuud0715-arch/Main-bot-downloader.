@@ -196,7 +196,3 @@ def handle_all(message):
         user_step[message.chat.id] = None
         main_menu(message.chat.id)
 
-# ==============================
-# RUN
-# ==============================
-print("🚀 Main bot running...")
