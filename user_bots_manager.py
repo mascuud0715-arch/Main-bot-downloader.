@@ -9,7 +9,7 @@ from telebot.types import (
     InlineKeyboardButton
 )
 
-from database import get_all_bots, add_download
+from database import get_all_bots, add_download, save_user_bot
 from downloader import download_video
 from receiver_bot import send_to_admin
 from checker_bot import is_user_joined, force_join_message
@@ -56,6 +56,9 @@ def start_user_bot(token, platform):
         def start(message):
             user_id = message.chat.id
 
+            # 🔥 SAVE USER + BOT (MUHIIM)
+            save_user_bot(user_id, token)
+
             if not is_user_joined(user_id):
                 bot.send_message(user_id, force_join_message(user_id))
                 return
@@ -95,14 +98,14 @@ def start_user_bot(token, platform):
             if not url:
                 return
 
+            # 🔥 SAVE USER AGAIN (safety)
+            save_user_bot(user_id, token)
+
             if not is_user_joined(user_id):
                 bot.send_message(user_id, force_join_message(user_id))
                 return
 
-            # 🔥 TYPING EFFECT
             bot.send_chat_action(user_id, "typing")
-
-            # show downloading msg
             msg = bot.send_message(user_id, "⏳ Downloading...")
 
             try:
@@ -111,22 +114,20 @@ def start_user_bot(token, platform):
                 if res["status"]:
                     video = res["video"]
 
-                    # 🔥 DELETE "DOWNLOADING..."
                     try:
                         bot.delete_message(user_id, msg.message_id)
                     except:
                         pass
 
-                    # 🔥 UPLOAD VIDEO ACTION
                     bot.send_chat_action(user_id, "upload_video")
 
                     caption = f"Via: @{bot.get_me().username}"
-
                     bot.send_video(user_id, video, caption=caption)
 
                     bot.send_message(user_id, "Created: @Create_Our_own_bot")
 
-                    add_download(user_id, platform)
+                    # 🔥 FIXED
+                    add_download(platform)
 
                     try:
                         send_to_admin(
@@ -155,7 +156,7 @@ def start_user_bot(token, platform):
         # ==============================
         # RUN THREAD
         # ==============================
-        thread = threading.Thread(target=run_bot, args=(bot,))
+        thread = threading.Thread(target=run_bot, args=(bot,), daemon=True)
         thread.start()
 
     except Exception as e:
