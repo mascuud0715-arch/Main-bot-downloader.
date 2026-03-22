@@ -59,6 +59,17 @@ def get_setting(key, default=None):
     return data["value"] if data else default
 
 # ==============================
+# GET CHANNELS
+# ==============================
+def get_channels():
+    data = db.settings.find_one({"type": "channels"})
+    
+    if data and "channels" in data:
+        return data["channels"]
+    
+    return []
+
+# ==============================
 # DOWNLOAD STATS
 # ==============================
 def add_download(platform):
