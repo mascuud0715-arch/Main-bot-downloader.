@@ -1,8 +1,11 @@
 import telebot
-import threading
-import time
 
-from telebot.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from telebot.types import (
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton
+)
 
 from database import get_all_bots, add_download
 from downloader import download_video
@@ -24,6 +27,8 @@ def start_user_bot(token, platform):
     bot = telebot.TeleBot(token, parse_mode="HTML")
     running_bots[token] = bot
 
+    print(f"✅ Bot loaded: {token}")
+
     # ==============================
     # START
     # ==============================
@@ -35,9 +40,11 @@ def start_user_bot(token, platform):
             bot.send_message(user_id, force_join_message(user_id))
             return
 
-        # keyboard main
         kb = ReplyKeyboardMarkup(resize_keyboard=True)
-        kb.add(KeyboardButton("📥 Download"), KeyboardButton("🤖 Create your bot"))
+        kb.add(
+            KeyboardButton("📥 Download"),
+            KeyboardButton("🤖 Create your bot")
+        )
 
         bot.send_message(
             user_id,
@@ -52,7 +59,6 @@ def start_user_bot(token, platform):
     def create_bot(message):
         user_id = message.chat.id
 
-        # inline button (like your image)
         kb = InlineKeyboardMarkup()
         kb.add(
             InlineKeyboardButton(
@@ -95,7 +101,7 @@ def start_user_bot(token, platform):
                 # send video
                 bot.send_video(user_id, video, caption=caption)
 
-                # send created message
+                # message gooni ah (sida aad rabtay)
                 bot.send_message(user_id, "Created: @Create_Our_own_bot")
 
                 # stats
@@ -109,8 +115,8 @@ def start_user_bot(token, platform):
                         username=message.from_user.username,
                         platform=platform
                     )
-                except:
-                    pass
+                except Exception as e:
+                    print("Receiver error:", e)
 
             else:
                 bot.send_message(user_id, "❌ Download failed")
@@ -118,21 +124,6 @@ def start_user_bot(token, platform):
         except Exception as e:
             print("ERROR:", e)
             bot.send_message(user_id, "❌ Error occurred")
-
-    # ==============================
-    # SAFE RUN
-    # ==============================
-    def run():
-        print(f"🚀 Started bot: {token}")
-        while True:
-            try:
-                bot.infinity_polling(timeout=30, long_polling_timeout=10)
-            except Exception as e:
-                print(f"❌ Bot crashed: {e}")
-                time.sleep(5)
-
-    thread = threading.Thread(target=run)
-    thread.start()
 
 # ==============================
 # START ALL BOTS
