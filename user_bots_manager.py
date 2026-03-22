@@ -54,18 +54,30 @@ def start_user_bot(token, platform):
             print("❌ Invalid token:", token)
             return
 
-        # ❌ duplicate protection (IMPORTANT 🔥)
+        # ❌ duplicate protection (REAL FIX)
         if token in running_bots:
             print("⚠️ Already running:", token[:10])
             return
 
+        # ==============================
+        # CREATE BOT
+        # ==============================
         bot = telebot.TeleBot(token, parse_mode="HTML")
 
-        # 🔥 VERY IMPORTANT (fix 409 error)
+        # 🔥 KILL OLD CONNECTION (IMPORTANT FIX 409)
         try:
-            bot.remove_webhook()
+            bot.stop_polling()
         except:
             pass
+
+        try:
+            bot.remove_webhook()
+            time.sleep(1)
+        except:
+            pass
+
+        # 🔒 mark as running
+        bot.is_running = True
 
         running_bots[token] = bot
 
@@ -78,15 +90,12 @@ def start_user_bot(token, platform):
         def start(message):
             user_id = message.chat.id
 
-            # ✅ SAVE USER
             add_user(user_id)
 
-            # ❌ SYSTEM OFF
             if get_setting("system_status") == "OFF":
                 bot.send_message(user_id, "⛔ Bot is currently OFF")
                 return
 
-            # ❌ FORCE JOIN
             if not is_user_joined(user_id):
                 bot.send_message(user_id, force_join_message(user_id))
                 return
@@ -112,7 +121,6 @@ def start_user_bot(token, platform):
                     url="https://t.me/Create_Our_own_bot"
                 )
             )
-
             bot.send_message(message.chat.id, "Click below 👇", reply_markup=kb)
 
         # ==============================
@@ -126,20 +134,15 @@ def start_user_bot(token, platform):
             if not url:
                 return
 
-            # ❌ SYSTEM OFF
             if get_setting("system_status") == "OFF":
                 bot.send_message(user_id, "⛔ Bot is currently OFF")
                 return
 
-            # ❌ FORCE JOIN
             if not is_user_joined(user_id):
                 bot.send_message(user_id, force_join_message(user_id))
                 return
 
-            # typing
             bot.send_chat_action(user_id, "typing")
-
-            # downloading msg
             msg = bot.send_message(user_id, "⏳ Downloading...")
 
             try:
@@ -148,13 +151,11 @@ def start_user_bot(token, platform):
                 if res.get("status"):
                     video = res.get("video")
 
-                    # delete downloading
                     try:
                         bot.delete_message(user_id, msg.message_id)
                     except:
                         pass
 
-                    # uploading animation
                     bot.send_chat_action(user_id, "upload_video")
 
                     bot.send_video(
@@ -165,10 +166,9 @@ def start_user_bot(token, platform):
 
                     bot.send_message(user_id, "Created: @Create_Our_own_bot")
 
-                    # stats
                     add_download(user_id, platform)
 
-                    # RECEIVER SYSTEM
+                    # RECEIVER
                     if get_setting("receiver_status") == "ON":
                         try:
                             send_to_admin(
@@ -199,7 +199,7 @@ def start_user_bot(token, platform):
                 bot.send_message(user_id, "❌ Error occurred")
 
         # ==============================
-        # START THREAD
+        # START THREAD (SAFE)
         # ==============================
         thread = threading.Thread(
             target=run_bot,
