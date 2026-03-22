@@ -1,84 +1,100 @@
 from pymongo import MongoClient
-import os
+from config import MONGO_URI
 
-MONGO_URI = os.getenv("MONGO_URI")
-
+# ==============================
+# CONNECT DB
+# ==============================
 client = MongoClient(MONGO_URI)
-db = client["telegram_bot_system"]
+db = client["bot_system"]
 
-users = db["users"]
-bots = db["bots"]
-settings = db["settings"]
-channels = db["channels"]
-downloads = db["downloads"]
+bots_col = db["bots"]
+users_col = db["users"]
+stats_col = db["stats"]
+settings_col = db["settings"]
 
 # ==============================
 # USERS
 # ==============================
-def add_user(user_id, username):
-    if not users.find_one({"user_id": user_id}):
-        users.insert_one({
-            "user_id": user_id,
-            "username": username
-        })
+def add_user(user_id):
+    try:
+        users_col.update_one(
+            {"user_id": user_id},
+            {"$set": {"user_id": user_id}},
+            upsert=True
+        )
+    except Exception as e:
+        print("DB USER ERROR:", e)
 
-def get_all_users():
-    return list(users.find())
+def get_users_count():
+    try:
+        return users_col.count_documents({})
+    except:
+        return 0
+
+# ==============================
+# DOWNLOAD STATS
+# ==============================
+def add_download(user_id, platform):
+    try:
+        stats_col.update_one(
+            {"platform": platform},
+            {"$inc": {"count": 1}},
+            upsert=True
+        )
+    except Exception as e:
+        print("DB DOWNLOAD ERROR:", e)
+
+def get_all_stats():
+    try:
+        return list(stats_col.find())
+    except:
+        return []
 
 # ==============================
 # BOTS
 # ==============================
-def add_bot(user_id, token, platform):
-    bots.insert_one({
-        "user_id": user_id,
-        "token": token,
-        "platform": platform
-    })
+def add_bot(token, platform):
+    try:
+        bots_col.update_one(
+            {"token": token},
+            {"$set": {
+                "token": token,
+                "platform": platform
+            }},
+            upsert=True
+        )
+    except Exception as e:
+        print("DB ADD BOT ERROR:", e)
 
 def get_all_bots():
-    return list(bots.find())
-
-def get_user_bots(user_id):
-    return list(bots.find({"user_id": user_id}))
+    try:
+        return list(bots_col.find())
+    except Exception as e:
+        print("DB GET BOTS ERROR:", e)
+        return []
 
 def delete_bot(token):
-    bots.delete_one({"token": token})
+    try:
+        bots_col.delete_one({"token": token})
+    except Exception as e:
+        print("DB DELETE BOT ERROR:", e)
 
 # ==============================
 # SETTINGS
 # ==============================
 def set_setting(key, value):
-    settings.update_one(
-        {"key": key},
-        {"$set": {"value": value}},
-        upsert=True
-    )
+    try:
+        settings_col.update_one(
+            {"key": key},
+            {"$set": {"value": value}},
+            upsert=True
+        )
+    except Exception as e:
+        print("DB SETTING ERROR:", e)
 
-def get_setting(key, default=None):
-    data = settings.find_one({"key": key})
-    return data["value"] if data else default
-
-# ==============================
-# GET CHANNELS
-# ==============================
-def get_channels():
-    data = db.settings.find_one({"type": "channels"})
-    
-    if data and "channels" in data:
-        return data["channels"]
-    
-    return []
-
-# ==============================
-# DOWNLOAD STATS
-# ==============================
-def add_download(platform):
-    downloads.insert_one({"platform": platform})
-
-def get_download_count():
-    return downloads.count_documents({})
-
-def get_platform_stats():
-    return list(downloads.aggregate([
-        {"$group": {"_id": "$platform", "count": {"$sum": 1}}}
-    ]))
+def get_setting(key):
+    try:
+        s = settings_col.find_one({"key": key})
+        return s["value"] if s else "ON"
+    except:
+        return "ON"
