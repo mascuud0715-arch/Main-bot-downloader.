@@ -2,99 +2,52 @@ import threading
 import time
 
 # IMPORT BOTS
-from main_bot import bot as main_bot
-from admin_bot import bot as admin_bot
-from receiver_bot import bot as receiver_bot
-from checker_bot import bot as checker_bot
+import main_bot
+import admin_bot
+import receiver_bot
 
-# USER BOTS
-from user_bots_manager import start_all_bots, running_bots
+# USER BOTS MANAGER
+from user_bots_manager import start_all_bots
 
-# ==============================
-# SAFE RUN FUNCTION
-# ==============================
-def run_bot(bot_instance, name):
-    print(f"🚀 {name} started")
-
-    while True:
-        try:
-            bot_instance.infinity_polling(timeout=30, long_polling_timeout=10)
-        except Exception as e:
-            print(f"❌ {name} crashed:", e)
-            time.sleep(5)
 
 # ==============================
-# START USER BOT THREAD
+# THREAD RUNNER
 # ==============================
-def start_user_bot_thread(token, bot):
-    name = f"UserBot-{token[:10]}"
+def run_main():
+    print("🚀 Starting MAIN bot...")
+    main_bot.bot.infinity_polling(skip_pending=True)
 
-    if hasattr(bot, "is_running"):
-        return
+def run_admin():
+    print("🛠 Starting ADMIN bot...")
+    admin_bot.bot.infinity_polling(skip_pending=True)
 
-    bot.is_running = True
+def run_receiver():
+    print("📡 Starting RECEIVER bot...")
+    receiver_bot.bot.infinity_polling(skip_pending=True)
 
-    threading.Thread(
-        target=run_bot,
-        args=(bot, name),
-        daemon=True
-    ).start()
-
-    print(f"✅ Started {name}")
-
-# ==============================
-# MONITOR NEW USER BOTS
-# ==============================
-def monitor_user_bots():
-    print("👀 Monitoring user bots...")
-
-    while True:
-        try:
-            # reload bots from DB
-            start_all_bots()
-
-            # start new ones
-            for token, bot in running_bots.items():
-                start_user_bot_thread(token, bot)
-
-        except Exception as e:
-            print("❌ Monitor error:", e)
-
-        time.sleep(10)  # check every 10 sec
-
-# ==============================
-# START SYSTEM
-# ==============================
-if __name__ == "__main__":
-    print("🔥 STARTING FULL SYSTEM...")
-
-    # 🔥 LOAD USER BOTS FIRST
+def run_user_bots():
+    print("🤖 Loading USER bots...")
     start_all_bots()
 
-    # ==========================
-    # THREADS LIST
-    # ==========================
-    threads = []
 
-    # MAIN BOTS
-    threads.append(threading.Thread(target=run_bot, args=(main_bot, "Main Bot"), daemon=True))
-    threads.append(threading.Thread(target=run_bot, args=(admin_bot, "Admin Bot"), daemon=True))
-    threads.append(threading.Thread(target=run_bot, args=(receiver_bot, "Receiver Bot"), daemon=True))
-    threads.append(threading.Thread(target=run_bot, args=(checker_bot, "Checker Bot"), daemon=True))
+# ==============================
+# START ALL
+# ==============================
+if __name__ == "__main__":
+    t1 = threading.Thread(target=run_main)
+    t2 = threading.Thread(target=run_admin)
+    t3 = threading.Thread(target=run_receiver)
+    t4 = threading.Thread(target=run_user_bots)
 
-    # USER BOTS (INITIAL START)
-    for token, bot in running_bots.items():
-        start_user_bot_thread(token, bot)
+    t1.start()
+    time.sleep(1)
 
-    # MONITOR THREAD (VERY IMPORTANT 🔥)
-    threads.append(threading.Thread(target=monitor_user_bots, daemon=True))
+    t2.start()
+    time.sleep(1)
 
-    # ==========================
-    # START ALL THREADS
-    # ==========================
-    for t in threads:
-        t.start()
+    t3.start()
+    time.sleep(1)
 
-    # KEEP ALIVE
-    while True:
-        time.sleep(60)
+    t4.start()
+
+    print("🔥 ALL SYSTEM RUNNING...")
