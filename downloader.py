@@ -1,75 +1,44 @@
-import requests
+import yt_dlp
+import os
+import uuid
 
 # ==============================
-# TIKTOK DOWNLOADER
+# DOWNLOAD FUNCTION
 # ==============================
-def download_tiktok(url):
+def download_video(url, platform="Unknown"):
     try:
-        api = f"https://tikwm.com/api/?url={url}"
-        res = requests.get(api).json()
+        # unique filename
+        file_id = str(uuid.uuid4())
+        filename = f"{file_id}.mp4"
 
-        video = res["data"]["play"]
-        return {
-            "status": True,
-            "video": video
+        # download path
+        output_path = os.path.join("downloads", filename)
+
+        # create folder if not exists
+        if not os.path.exists("downloads"):
+            os.makedirs("downloads")
+
+        # yt-dlp options
+        ydl_opts = {
+            "outtmpl": output_path,
+            "format": "mp4/best",
+            "noplaylist": True,
+            "quiet": True,
+            "nocheckcertificate": True,
         }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+
+        # check file exists
+        if os.path.exists(output_path):
+            return {
+                "status": True,
+                "video": open(output_path, "rb")
+            }
+
+        return {"status": False}
 
     except Exception as e:
-        return {
-            "status": False,
-            "error": str(e)
-        }
-
-# ==============================
-# INSTAGRAM DOWNLOADER
-# ==============================
-def download_instagram(url):
-    try:
-        api = f"https://api.vevioz.com/api/button/mp4?url={url}"
-
-        return {
-            "status": True,
-            "video": api
-        }
-
-    except Exception as e:
-        return {
-            "status": False,
-            "error": str(e)
-        }
-
-# ==============================
-# X (TWITTER) DOWNLOADER
-# ==============================
-def download_x(url):
-    try:
-        # simple placeholder (waxaad badali kartaa API kale)
-        return {
-            "status": True,
-            "video": url
-        }
-
-    except Exception as e:
-        return {
-            "status": False,
-            "error": str(e)
-        }
-
-# ==============================
-# UNIVERSAL DOWNLOADER
-# ==============================
-def download_video(url, platform):
-    if platform == "TikTok":
-        return download_tiktok(url)
-
-    elif platform == "Instagram":
-        return download_instagram(url)
-
-    elif platform == "X":
-        return download_x(url)
-
-    else:
-        return {
-            "status": False,
-            "error": "Unsupported platform"
-        }
+        print("DOWNLOAD ERROR:", e)
+        return {"status": False}
