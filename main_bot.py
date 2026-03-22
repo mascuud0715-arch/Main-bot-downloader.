@@ -1,8 +1,9 @@
 import telebot
+import threading
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton
+
 from config import MAIN_BOT_TOKEN
 from database import bots
-
 from user_bots_manager import start_user_bot
 
 bot = telebot.TeleBot(MAIN_BOT_TOKEN, parse_mode="HTML")
@@ -10,10 +11,9 @@ bot = telebot.TeleBot(MAIN_BOT_TOKEN, parse_mode="HTML")
 user_step = {}
 
 # ==============================
-# START
+# MAIN MENU FUNCTION
 # ==============================
-@bot.message_handler(commands=['start'])
-def start(message):
+def main_menu(chat_id):
     kb = ReplyKeyboardMarkup(resize_keyboard=True)
     kb.add(
         KeyboardButton("➕ ADD BOT"),
@@ -22,7 +22,7 @@ def start(message):
     kb.add(KeyboardButton("❌ REMOVE BOT"))
 
     bot.send_message(
-        message.chat.id,
+        chat_id,
 """🤖 Welcome to Bot System
 
 📥 Features:
@@ -39,11 +39,18 @@ def start(message):
     )
 
 # ==============================
+# START
+# ==============================
+@bot.message_handler(commands=['start'])
+def start(message):
+    main_menu(message.chat.id)
+
+# ==============================
 # ADD BOT
 # ==============================
 @bot.message_handler(func=lambda m: m.text == "➕ ADD BOT")
 def add_bot(message):
-    bot.send_message(message.chat.id, "📥 Send your BOT TOKEN:")
+    bot.send_message(message.chat.id, "📥 Send your BOT TOKEN from @BotFather :")
     user_step[message.chat.id] = "waiting_token"
 
 # ==============================
@@ -58,20 +65,11 @@ def show_bots(message):
         return
 
     text = "🤖 Your Bots:\n\n"
-    count = 0
+    for i, b in enumerate(user_bots, start=1):
+        username = b.get("username", "Unknown")
+        platform = b.get("platform", "Unknown")
 
-    for b in user_bots:
-        username = b.get("username")
-
-        if not username:
-            continue
-
-        count += 1
-        text += f"{count}. @{username} ({b.get('platform')})\n"
-
-    if count == 0:
-        bot.send_message(message.chat.id, "❌ You don't have any bots")
-        return
+        text += f"{i}. @{username} ({platform})\n"
 
     bot.send_message(message.chat.id, text)
 
@@ -131,7 +129,7 @@ def handle_all(message):
     # ======================
     # PLATFORM STEP
     # ======================
-    elif isinstance(step, dict) and "token" in step:
+    elif isinstance(step, dict):
         platform = message.text
         token = step["token"]
         username = step["username"]
@@ -144,8 +142,10 @@ def handle_all(message):
         if existing:
             bot.send_message(message.chat.id, "⚠️ Bot already exists")
             user_step[message.chat.id] = None
+            main_menu(message.chat.id)
             return
 
+        # SAVE DB
         bots.insert_one({
             "user_id": message.chat.id,
             "token": token,
@@ -153,8 +153,14 @@ def handle_all(message):
             "username": username
         })
 
-        # 🔥 START BOT
-        start_user_bot(token, platform)
+        # 🔥 START BOT (THREAD FIXED)
+        def run_bot():
+            try:
+                start_user_bot(token, platform)
+            except Exception as e:
+                print("START BOT ERROR:", e)
+
+        threading.Thread(target=run_bot).start()
 
         bot.send_message(
             message.chat.id,
@@ -167,6 +173,9 @@ def handle_all(message):
         )
 
         user_step[message.chat.id] = None
+
+        # 🔥 BACK TO MENU
+        main_menu(message.chat.id)
 
     # ======================
     # REMOVE STEP
@@ -185,7 +194,7 @@ def handle_all(message):
             bot.send_message(message.chat.id, "❌ Bot not found")
 
         user_step[message.chat.id] = None
-
+        main_menu(message.chat.id)
 
 # ==============================
 # RUN
