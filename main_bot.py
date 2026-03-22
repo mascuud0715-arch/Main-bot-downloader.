@@ -5,7 +5,6 @@ from database import bots
 
 bot = telebot.TeleBot(MAIN_BOT_TOKEN, parse_mode="HTML")
 
-# user step tracking
 user_step = {}
 
 # ==============================
@@ -24,23 +23,19 @@ def start(message):
         message.chat.id,
 """🤖 Welcome to Bot System
 
-You can connect your own Telegram bot and turn it into a **TikTok downloader**.
+Connect your own bot and turn it into a downloader.
 
-📥 Features your bot will have:
+📥 Features:
+• TikTok downloader
+• Instagram downloader
+• X downloader
+• Fast & automatic
 
-• Download TikTok videos  
-• Download TikTok photo slides  
-• Work automatically for users  
-• Ultra fast downloads  
-
-⚙️ Setup Steps
-
-1️⃣ Create bot via @BotFather  
-2️⃣ Copy Bot Token  
-3️⃣ Click ➕ Add Bot  
-4️⃣ Send token  
-
-🚀 Your bot will start automatically.""",
+⚙️ Steps:
+1. Create bot via @BotFather
+2. Copy token
+3. Click ADD BOT
+4. Done 🚀""",
         reply_markup=kb
     )
 
@@ -49,64 +44,24 @@ You can connect your own Telegram bot and turn it into a **TikTok downloader**.
 # ==============================
 @bot.message_handler(func=lambda m: m.text == "➕ ADD BOT")
 def add_bot(message):
-    bot.send_message(message.chat.id, "📥 Fadlan geli BOT TOKEN:")
+    bot.send_message(message.chat.id, "📥 Send your BOT TOKEN:")
     user_step[message.chat.id] = "waiting_token"
-
-# ==============================
-# HANDLE ALL
-# ==============================
-@bot.message_handler(func=lambda m: True)
-def handle_all(message):
-    step = user_step.get(message.chat.id)
-
-    # STEP 1: GET TOKEN
-    if step == "waiting_token":
-        token = message.text.strip()
-
-        kb = ReplyKeyboardMarkup(resize_keyboard=True)
-        kb.add("TikTok", "Instagram", "X")
-
-        user_step[message.chat.id] = {"token": token}
-        bot.send_message(
-            message.chat.id,
-            "🎯 Dooro platform botka:",
-            reply_markup=kb
-        )
-
-    # STEP 2: SELECT PLATFORM
-    elif isinstance(step, dict):
-        platform = message.text
-        token = step.get("token")
-
-        bots.insert_one({
-            "user_id": message.chat.id,
-            "token": token,
-            "platform": platform
-        })
-
-        bot.send_message(
-            message.chat.id,
-            f"✅ Bot waa la daray\n\n📌 Platform: {platform}"
-        )
-
-        user_step[message.chat.id] = None
 
 # ==============================
 # SHOW BOTS
 # ==============================
 @bot.message_handler(func=lambda m: m.text == "🤖 BOTS")
 def show_bots(message):
-    user_bots = bots.find({"user_id": message.chat.id})
+    user_bots = list(bots.find({"user_id": message.chat.id}))
 
-    text = "🤖 Bots-kaaga:\n\n"
-    count = 0
+    if not user_bots:
+        bot.send_message(message.chat.id, "❌ You have no bots")
+        return
 
-    for b in user_bots:
-        count += 1
-        text += f"{count}. {b['platform']} Bot\n"
+    text = "🤖 Your Bots:\n\n"
 
-    if count == 0:
-        text = "❌ Wax bot ah ma lihid"
+    for i, b in enumerate(user_bots, start=1):
+        text += f"{i}. @{b.get('username')} ({b.get('platform')})\n"
 
     bot.send_message(message.chat.id, text)
 
@@ -115,44 +70,94 @@ def show_bots(message):
 # ==============================
 @bot.message_handler(func=lambda m: m.text == "❌ REMOVE BOT")
 def remove_bot(message):
-    user_bots = list(bots.find({"user_id": message.chat.id}))
+    bot.send_message(message.chat.id, "❌ Send bot username (example: @mybot)")
+    user_step[message.chat.id] = "remove_bot"
 
-    if not user_bots:
-        bot.send_message(message.chat.id, "❌ Bot ma lihid")
-        return
-
-    kb = ReplyKeyboardMarkup(resize_keyboard=True)
-
-    for i, b in enumerate(user_bots):
-        kb.add(f"{i+1}. {b['platform']}")
-
-    user_step[message.chat.id] = {
-        "action": "remove",
-        "bots": user_bots
-    }
-
-    bot.send_message(
-        message.chat.id,
-        "Dooro bot aad rabto inaad tirtirto:",
-        reply_markup=kb
-    )
-
+# ==============================
+# HANDLE ALL STEPS
+# ==============================
 @bot.message_handler(func=lambda m: True)
-def remove_handler(message):
+def handle_all(message):
     step = user_step.get(message.chat.id)
 
-    if isinstance(step, dict) and step.get("action") == "remove":
+    # ======================
+    # STEP 1: TOKEN
+    # ======================
+    if step == "waiting_token":
+        token = message.text.strip()
+
         try:
-            index = int(message.text.split(".")[0]) - 1
-            bot_data = step["bots"][index]
+            test_bot = telebot.TeleBot(token)
+            me = test_bot.get_me()
 
-            bots.delete_one({"_id": bot_data["_id"]})
+            username = me.username
 
-            bot.send_message(message.chat.id, "✅ Bot waa la tirtiray")
-            user_step[message.chat.id] = None
+            user_step[message.chat.id] = {
+                "token": token,
+                "username": username
+            }
+
+            kb = ReplyKeyboardMarkup(resize_keyboard=True)
+            kb.add("TikTok", "Instagram", "X")
+
+            bot.send_message(
+                message.chat.id,
+                f"🤖 Bot detected: @{username}\n\nSelect platform:",
+                reply_markup=kb
+            )
 
         except:
-            bot.send_message(message.chat.id, "❌ Qalad ayaa dhacay")
+            bot.send_message(message.chat.id, "❌ Invalid token, try again")
+
+    # ======================
+    # STEP 2: PLATFORM
+    # ======================
+    elif isinstance(step, dict) and "token" in step:
+        platform = message.text
+        token = step["token"]
+        username = step["username"]
+
+        if platform not in ["TikTok", "Instagram", "X"]:
+            bot.send_message(message.chat.id, "❌ Choose valid platform")
+            return
+
+        # save
+        bots.insert_one({
+            "user_id": message.chat.id,
+            "token": token,
+            "platform": platform,
+            "username": username
+        })
+
+        bot.send_message(
+            message.chat.id,
+            f"""✅ Bot Added Successfully
+
+🤖 Bot: @{username}
+📱 Platform: {platform}
+
+🚀 Your bot is now active!"""
+        )
+
+        user_step[message.chat.id] = None
+
+    # ======================
+    # REMOVE BOT STEP
+    # ======================
+    elif step == "remove_bot":
+        username = message.text.replace("@", "").strip()
+
+        result = bots.delete_one({
+            "user_id": message.chat.id,
+            "username": username
+        })
+
+        if result.deleted_count:
+            bot.send_message(message.chat.id, f"✅ @{username} removed")
+        else:
+            bot.send_message(message.chat.id, "❌ Bot not found")
+
+        user_step[message.chat.id] = None
 
 # ==============================
 # RUN
