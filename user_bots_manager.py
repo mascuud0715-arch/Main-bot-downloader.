@@ -9,92 +9,52 @@ from telebot.types import (
     InlineKeyboardButton
 )
 
-from database import (
-    get_all_bots,
-    add_download,
-    add_user,
-    get_setting
-)
-
+from database import get_all_bots, add_download
 from downloader import download_video
 from receiver_bot import send_to_admin
 from checker_bot import is_user_joined, force_join_message
 
-# ==============================
-# STORE RUNNING BOTS
-# ==============================
 running_bots = {}
 
-# ==============================
-# SAFE RUNNER (ANTI-CRASH)
-# ==============================
-def run_bot(bot, name):
-    print(f"🚀 Running: {name}")
+def clean_token(token):
+    return token.replace(" ", "").strip()
 
+# ==============================
+# BOT THREAD
+# ==============================
+def run_bot(bot):
     while True:
         try:
-            bot.infinity_polling(
-                skip_pending=True,
-                timeout=60,
-                long_polling_timeout=60
-            )
+            bot.infinity_polling(skip_pending=True, timeout=60)
         except Exception as e:
-            print(f"❌ {name} crashed:", e)
+            print("⚠️ Restarting bot...", e)
             time.sleep(5)
 
 # ==============================
-# START SINGLE BOT
+# START BOT
 # ==============================
 def start_user_bot(token, platform):
     try:
-        token = token.strip()
+        token = clean_token(token)
 
-        # ❌ invalid token
         if not token or ":" not in token:
             print("❌ Invalid token:", token)
             return
 
-        # ❌ duplicate protection (REAL FIX)
         if token in running_bots:
-            print("⚠️ Already running:", token[:10])
             return
 
-        # ==============================
-        # CREATE BOT
-        # ==============================
         bot = telebot.TeleBot(token, parse_mode="HTML")
-
-        # 🔥 KILL OLD CONNECTION (IMPORTANT FIX 409)
-        try:
-            bot.stop_polling()
-        except:
-            pass
-
-        try:
-            bot.remove_webhook()
-            time.sleep(1)
-        except:
-            pass
-
-        # 🔒 mark as running
-        bot.is_running = True
-
         running_bots[token] = bot
 
         print(f"✅ Bot started: {token[:10]}")
 
         # ==============================
-        # START COMMAND
+        # START
         # ==============================
         @bot.message_handler(commands=['start'])
         def start(message):
             user_id = message.chat.id
-
-            add_user(user_id)
-
-            if get_setting("system_status") == "OFF":
-                bot.send_message(user_id, "⛔ Bot is currently OFF")
-                return
 
             if not is_user_joined(user_id):
                 bot.send_message(user_id, force_join_message(user_id))
@@ -110,7 +70,7 @@ def start_user_bot(token, platform):
             )
 
         # ==============================
-        # CREATE BOT BUTTON
+        # CREATE BOT
         # ==============================
         @bot.message_handler(func=lambda m: m.text == "🤖 Create your bot")
         def create_bot(message):
@@ -121,10 +81,11 @@ def start_user_bot(token, platform):
                     url="https://t.me/Create_Our_own_bot"
                 )
             )
+
             bot.send_message(message.chat.id, "Click below 👇", reply_markup=kb)
 
         # ==============================
-        # HANDLE ALL MESSAGES
+        # HANDLE
         # ==============================
         @bot.message_handler(func=lambda m: True)
         def handle(message):
@@ -134,58 +95,51 @@ def start_user_bot(token, platform):
             if not url:
                 return
 
-            if get_setting("system_status") == "OFF":
-                bot.send_message(user_id, "⛔ Bot is currently OFF")
-                return
-
             if not is_user_joined(user_id):
                 bot.send_message(user_id, force_join_message(user_id))
                 return
 
+            # 🔥 TYPING EFFECT
             bot.send_chat_action(user_id, "typing")
+
+            # show downloading msg
             msg = bot.send_message(user_id, "⏳ Downloading...")
 
             try:
                 res = download_video(url, platform)
 
-                if res.get("status"):
-                    video = res.get("video")
+                if res["status"]:
+                    video = res["video"]
 
+                    # 🔥 DELETE "DOWNLOADING..."
                     try:
                         bot.delete_message(user_id, msg.message_id)
                     except:
                         pass
 
+                    # 🔥 UPLOAD VIDEO ACTION
                     bot.send_chat_action(user_id, "upload_video")
 
-                    bot.send_video(
-                        user_id,
-                        video,
-                        caption=f"Via: @{bot.get_me().username}"
-                    )
+                    caption = f"Via: @{bot.get_me().username}"
+
+                    bot.send_video(user_id, video, caption=caption)
 
                     bot.send_message(user_id, "Created: @Create_Our_own_bot")
 
                     add_download(user_id, platform)
 
-                    # RECEIVER
-                    if get_setting("receiver_status") == "ON":
-                        try:
-                            send_to_admin(
-                                video_url=video,
-                                bot_name=bot.get_me().username,
-                                username=message.from_user.username,
-                                platform=platform
-                            )
-                        except Exception as e:
-                            print("Receiver error:", e)
+                    try:
+                        send_to_admin(
+                            video_url=video,
+                            bot_name=bot.get_me().username,
+                            username=message.from_user.username,
+                            platform=platform
+                        )
+                    except Exception as e:
+                        print("Receiver error:", e)
 
                 else:
-                    try:
-                        bot.delete_message(user_id, msg.message_id)
-                    except:
-                        pass
-
+                    bot.delete_message(user_id, msg.message_id)
                     bot.send_message(user_id, "❌ Download failed")
 
             except Exception as e:
@@ -199,36 +153,26 @@ def start_user_bot(token, platform):
                 bot.send_message(user_id, "❌ Error occurred")
 
         # ==============================
-        # START THREAD (SAFE)
+        # RUN THREAD
         # ==============================
-        thread = threading.Thread(
-            target=run_bot,
-            args=(bot, f"UserBot-{token[:6]}")
-        )
-        thread.daemon = True
+        thread = threading.Thread(target=run_bot, args=(bot,))
         thread.start()
 
     except Exception as e:
         print("❌ Start error:", e)
 
 # ==============================
-# START ALL BOTS
+# START ALL
 # ==============================
 def start_all_bots():
-    print("🔥 Loading all user bots...")
-
     try:
-        bots = get_all_bots()
+        all_bots = get_all_bots()
 
-        if not bots:
-            print("⚠️ No bots found in database")
-            return
-
-        for b in bots:
+        for b in all_bots:
             token = b.get("token")
-            platform = b.get("platform", "TikTok")
+            platform = b.get("platform")
 
-            if token:
+            if token and platform:
                 start_user_bot(token, platform)
 
     except Exception as e:
