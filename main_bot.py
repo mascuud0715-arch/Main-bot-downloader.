@@ -3,6 +3,9 @@ from telebot.types import ReplyKeyboardMarkup, KeyboardButton
 from config import MAIN_BOT_TOKEN
 from database import bots
 
+# 🔥 muhiim
+from user_bots_manager import start_user_bot
+
 bot = telebot.TeleBot(MAIN_BOT_TOKEN, parse_mode="HTML")
 
 user_step = {}
@@ -54,7 +57,6 @@ def add_bot(message):
 def show_bots(message):
     user_bots = list(bots.find({"user_id": message.chat.id}))
 
-    # haddii waxba jirin
     if not user_bots:
         bot.send_message(message.chat.id, "❌ You don't have any bots")
         return
@@ -65,14 +67,12 @@ def show_bots(message):
     for b in user_bots:
         username = b.get("username")
 
-        # skip haddii username khaldan yahay
         if not username or username == "None":
             continue
 
         count += 1
         text += f"{count}. @{username} ({b.get('platform')})\n"
 
-    # haddii dhammaan ay khaldan yihiin
     if count == 0:
         bot.send_message(message.chat.id, "❌ You don't have any bots")
         return
@@ -88,7 +88,7 @@ def remove_bot(message):
     user_step[message.chat.id] = "remove_bot"
 
 # ==============================
-# HANDLE ALL STEPS
+# HANDLE ALL
 # ==============================
 @bot.message_handler(func=lambda m: True)
 def handle_all(message):
@@ -106,6 +106,7 @@ def handle_all(message):
 
             username = me.username
 
+            # store temp
             user_step[message.chat.id] = {
                 "token": token,
                 "username": username
@@ -135,13 +136,23 @@ def handle_all(message):
             bot.send_message(message.chat.id, "❌ Choose valid platform")
             return
 
-        # save
+        # ❌ check duplicate
+        existing = bots.find_one({"token": token})
+        if existing:
+            bot.send_message(message.chat.id, "⚠️ This bot already exists")
+            user_step[message.chat.id] = None
+            return
+
+        # ✅ SAVE
         bots.insert_one({
             "user_id": message.chat.id,
             "token": token,
             "platform": platform,
             "username": username
         })
+
+        # 🔥 START BOT INSTANTLY
+        start_user_bot(token, platform)
 
         bot.send_message(
             message.chat.id,
@@ -150,7 +161,7 @@ def handle_all(message):
 🤖 Bot: @{username}
 📱 Platform: {platform}
 
-🚀 Your bot is now active!"""
+🚀 Your bot is now LIVE!"""
         )
 
         user_step[message.chat.id] = None
@@ -173,8 +184,9 @@ def handle_all(message):
 
         user_step[message.chat.id] = None
 
+
 # ==============================
 # RUN
 # ==============================
-print("Main bot is running...")
+print("🚀 Main bot running...")
 bot.infinity_polling()
