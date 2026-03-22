@@ -7,7 +7,7 @@ import telebot
 bot = telebot.TeleBot(MAIN_BOT_TOKEN)
 
 # ==============================
-# CHANNELS (EDIT THIS 🔥)
+# CHANNELS
 # ==============================
 CHANNELS = [
     "@systemdownloadernews",
@@ -18,18 +18,20 @@ CHANNELS = [
 # CHECK USER JOINED
 # ==============================
 def is_user_joined(user_id):
-    try:
-        for ch in CHANNELS:
+    for ch in CHANNELS:
+        try:
             member = bot.get_chat_member(ch, user_id)
 
-            if member.status in ["left", "kicked"]:
+            print(f"[CHECK] {user_id} in {ch} => {member.status}")
+
+            if member.status not in ["member", "administrator", "creator"]:
                 return False
 
-        return True
+        except Exception as e:
+            print(f"[ERROR] {ch} =>", e)
+            return False
 
-    except Exception as e:
-        print("JOIN CHECK ERROR:", e)
-        return False
+    return True
 
 # ==============================
 # FORCE JOIN MESSAGE
