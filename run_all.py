@@ -3,13 +3,13 @@ import time
 import traceback
 
 # ==============================
-# IMPORT ALL BOTS
+# IMPORT BOTS
 # ==============================
 import main_bot
 import admin_bot
 import receiver_bot
 
-# USER BOTS
+# USER BOTS MANAGER
 from user_bots_manager import start_all_bots
 
 
@@ -59,17 +59,25 @@ def run_receiver():
 
 
 # ==============================
-# USER BOTS (AUTO LOAD + LOOP)
+# USER BOTS (SMART LOADER)
 # ==============================
 def run_user_bots():
+    print("🤖 Starting USER bots system...")
+
+    # 🔥 first load
+    try:
+        start_all_bots()
+    except Exception as e:
+        print("❌ Initial user bots error:", e)
+
+    # 🔁 check new bots only
     while True:
         try:
-            print("🤖 Checking USER bots...")
             start_all_bots()
         except Exception as e:
             print("❌ User bots error:", e)
 
-        time.sleep(10)  # 🔥 check every 10 seconds
+        time.sleep(30)  # 🔥 muhiim (ha ka dhigin 10 sec)
 
 
 # ==============================
@@ -94,7 +102,7 @@ if __name__ == "__main__":
     print("✅ ALL BOTS ARE RUNNING 🚀")
 
     # ==============================
-    # KEEP SYSTEM ALIVE (IMPORTANT)
+    # KEEP SYSTEM ALIVE
     # ==============================
     while True:
         time.sleep(60)
