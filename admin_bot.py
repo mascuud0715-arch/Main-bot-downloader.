@@ -1,7 +1,7 @@
 import telebot
 from telebot.types import ReplyKeyboardMarkup
-from database import get_all_users_global
 from config import ADMIN_BOT_TOKEN, ADMIN_ID
+
 from database import (
     set_setting,
     get_setting,
@@ -9,7 +9,8 @@ from database import (
     get_all_bots,
     get_download_count,
     get_platform_stats,
-    channels
+    channels,
+    get_users_by_bot   # 🔥 muhiim
 )
 
 bot = telebot.TeleBot(ADMIN_BOT_TOKEN, parse_mode="HTML")
@@ -19,6 +20,7 @@ bot = telebot.TeleBot(ADMIN_BOT_TOKEN, parse_mode="HTML")
 # ==============================
 def is_admin(user_id):
     return user_id == ADMIN_ID
+
 
 # ==============================
 # CHANNEL FUNCTIONS
@@ -43,6 +45,7 @@ def clear_all_channels():
     channels.delete_many({})
     return "✅ All channels removed"
 
+
 # ==============================
 # START PANEL
 # ==============================
@@ -61,6 +64,7 @@ def admin_panel(message):
 
     bot.send_message(message.chat.id, "⚙️ <b>Admin Panel</b>", reply_markup=kb)
 
+
 # ==============================
 # SYSTEM CONTROL
 # ==============================
@@ -75,6 +79,7 @@ def system_off(message):
     if not is_admin(message.chat.id): return
     set_setting("system_status", "OFF")
     bot.send_message(message.chat.id, "⛔ System is OFF")
+
 
 # ==============================
 # RECEIVER CONTROL
@@ -91,8 +96,9 @@ def receiver_off(message):
     set_setting("receiver_status", "OFF")
     bot.send_message(message.chat.id, "📤 Receiver OFF")
 
+
 # ==============================
-# BROADCAST (🔥 PRO VERSION)
+# 🔥 MULTI BOT BROADCAST (PRO)
 # ==============================
 @bot.message_handler(func=lambda m: m.text == "📢 Broadcast")
 def broadcast_start(message):
@@ -104,36 +110,46 @@ def broadcast_start(message):
     )
     bot.register_next_step_handler(msg, process_broadcast)
 
+
 def process_broadcast(message):
     if not is_admin(message.chat.id): return
 
-    users = get_all_users_global()
-    success = 0
-    fail = 0
+    data = get_users_by_bot()  # 🔥 muhiim
 
-    for uid in users:
+    total_success = 0
+    total_fail = 0
+
+    for token, user_list in data.items():
         try:
-            if message.text:
-                bot.send_message(uid, message.text)
+            small_bot = telebot.TeleBot(token)
 
-            elif message.photo:
-                bot.send_photo(uid, message.photo[-1].file_id, caption=message.caption)
+            for uid in user_list:
+                try:
+                    if message.text:
+                        small_bot.send_message(uid, message.text)
 
-            elif message.video:
-                bot.send_video(uid, message.video.file_id, caption=message.caption)
+                    elif message.photo:
+                        small_bot.send_photo(uid, message.photo[-1].file_id, caption=message.caption)
 
-            else:
-                bot.forward_message(uid, message.chat.id, message.message_id)
+                    elif message.video:
+                        small_bot.send_video(uid, message.video.file_id, caption=message.caption)
 
-            success += 1
+                    else:
+                        small_bot.forward_message(uid, message.chat.id, message.message_id)
+
+                    total_success += 1
+
+                except:
+                    total_fail += 1
 
         except Exception as e:
-            fail += 1
+            print("BOT ERROR:", e)
 
     bot.send_message(
         message.chat.id,
-        f"✅ Sent: {success}\n❌ Failed: {fail}"
+        f"✅ Sent: {total_success}\n❌ Failed: {total_fail}"
     )
+
 
 # ==============================
 # ADD CHANNEL
@@ -157,6 +173,7 @@ def save_channel(message):
     add_new_channel(ch)
     bot.send_message(message.chat.id, "✅ Channel added")
 
+
 # ==============================
 # CHANNELS
 # ==============================
@@ -165,6 +182,7 @@ def show_channels(message):
     if not is_admin(message.chat.id): return
     bot.send_message(message.chat.id, list_channels())
 
+
 # ==============================
 # CLEAR CHANNELS
 # ==============================
@@ -172,6 +190,7 @@ def show_channels(message):
 def clear_channels_handler(message):
     if not is_admin(message.chat.id): return
     bot.send_message(message.chat.id, clear_all_channels())
+
 
 # ==============================
 # STATS
@@ -201,7 +220,9 @@ def stats(message):
 
     bot.send_message(message.chat.id, text)
 
+
 # ==============================
 # RUN
 # ==============================
 print("🛠 Admin bot running...")
+bot.infinity_polling(skip_pending=True)
