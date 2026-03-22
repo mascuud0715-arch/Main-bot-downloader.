@@ -14,48 +14,40 @@ from downloader import download_video
 from receiver_bot import send_to_admin
 from checker_bot import is_user_joined, force_join_message
 
-# ==============================
-# STORE RUNNING BOTS
-# ==============================
 running_bots = {}
 
-# ==============================
-# CLEAN TOKEN
-# ==============================
 def clean_token(token):
     return token.replace(" ", "").strip()
 
 # ==============================
-# BOT THREAD RUNNER
+# BOT THREAD
 # ==============================
 def run_bot(bot):
     while True:
         try:
-            bot.infinity_polling(skip_pending=True, timeout=60, long_polling_timeout=60)
+            bot.infinity_polling(skip_pending=True, timeout=60)
         except Exception as e:
-            print("⚠️ Bot crashed, restarting...", e)
+            print("⚠️ Restarting bot...", e)
             time.sleep(5)
 
 # ==============================
-# START SINGLE BOT
+# START BOT
 # ==============================
 def start_user_bot(token, platform):
     try:
         token = clean_token(token)
 
-        # ❌ invalid token
         if not token or ":" not in token:
-            print("❌ Invalid token skipped:", token)
+            print("❌ Invalid token:", token)
             return
 
-        # ❌ already running
         if token in running_bots:
             return
 
         bot = telebot.TeleBot(token, parse_mode="HTML")
         running_bots[token] = bot
 
-        print(f"✅ Bot loaded: {token[:10]}")
+        print(f"✅ Bot started: {token[:10]}")
 
         # ==============================
         # START
@@ -69,9 +61,7 @@ def start_user_bot(token, platform):
                 return
 
             kb = ReplyKeyboardMarkup(resize_keyboard=True)
-            kb.add(
-                KeyboardButton("🤖 Create your bot")
-            )
+            kb.add(KeyboardButton("🤖 Create your bot"))
 
             bot.send_message(
                 user_id,
@@ -80,12 +70,10 @@ def start_user_bot(token, platform):
             )
 
         # ==============================
-        # CREATE BOT BUTTON
+        # CREATE BOT
         # ==============================
         @bot.message_handler(func=lambda m: m.text == "🤖 Create your bot")
         def create_bot(message):
-            user_id = message.chat.id
-
             kb = InlineKeyboardMarkup()
             kb.add(
                 InlineKeyboardButton(
@@ -94,14 +82,10 @@ def start_user_bot(token, platform):
                 )
             )
 
-            bot.send_message(
-                user_id,
-                "Click below 👇",
-                reply_markup=kb
-            )
+            bot.send_message(message.chat.id, "Click below 👇", reply_markup=kb)
 
         # ==============================
-        # HANDLE LINKS
+        # HANDLE
         # ==============================
         @bot.message_handler(func=lambda m: True)
         def handle(message):
@@ -115,7 +99,11 @@ def start_user_bot(token, platform):
                 bot.send_message(user_id, force_join_message(user_id))
                 return
 
-            bot.send_message(user_id, "⏳ Downloading...")
+            # 🔥 TYPING EFFECT
+            bot.send_chat_action(user_id, "typing")
+
+            # show downloading msg
+            msg = bot.send_message(user_id, "⏳ Downloading...")
 
             try:
                 res = download_video(url, platform)
@@ -123,18 +111,23 @@ def start_user_bot(token, platform):
                 if res["status"]:
                     video = res["video"]
 
+                    # 🔥 DELETE "DOWNLOADING..."
+                    try:
+                        bot.delete_message(user_id, msg.message_id)
+                    except:
+                        pass
+
+                    # 🔥 UPLOAD VIDEO ACTION
+                    bot.send_chat_action(user_id, "upload_video")
+
                     caption = f"Via: @{bot.get_me().username}"
 
-                    # send video
                     bot.send_video(user_id, video, caption=caption)
 
-                    # message gaar ah
                     bot.send_message(user_id, "Created: @Create_Our_own_bot")
 
-                    # stats
                     add_download(user_id, platform)
 
-                    # receiver
                     try:
                         send_to_admin(
                             video_url=video,
@@ -146,21 +139,30 @@ def start_user_bot(token, platform):
                         print("Receiver error:", e)
 
                 else:
+                    bot.delete_message(user_id, msg.message_id)
                     bot.send_message(user_id, "❌ Download failed")
 
             except Exception as e:
                 print("ERROR:", e)
+
+                try:
+                    bot.delete_message(user_id, msg.message_id)
+                except:
+                    pass
+
                 bot.send_message(user_id, "❌ Error occurred")
 
-        # ▶️ START THREAD
+        # ==============================
+        # RUN THREAD
+        # ==============================
         thread = threading.Thread(target=run_bot, args=(bot,))
         thread.start()
 
     except Exception as e:
-        print("❌ Bot start error:", token, e)
+        print("❌ Start error:", e)
 
 # ==============================
-# START ALL BOTS
+# START ALL
 # ==============================
 def start_all_bots():
     try:
@@ -174,4 +176,4 @@ def start_all_bots():
                 start_user_bot(token, platform)
 
     except Exception as e:
-        print("❌ Error loading bots:", e)
+        print("❌ Load error:", e)
