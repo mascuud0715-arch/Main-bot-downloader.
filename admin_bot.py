@@ -210,4 +210,3 @@ def stats(message):
 # RUN
 # ==============================
 print("🛠 Admin bot running...")
-bot.infinity_polling(skip_pending=True)
