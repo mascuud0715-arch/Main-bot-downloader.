@@ -43,6 +43,20 @@ def add_user(user_id):
 def get_all_users():
     return list(users.find())
 
+def get_all_users_global():
+    user_ids = set()
+
+    # users collection
+    for u in users.find():
+        user_ids.add(u.get("user_id"))
+
+    # bots collection (haddii user bots leeyihiin users)
+    for b in bots.find():
+        if "user_id" in b:
+            user_ids.add(b.get("user_id"))
+
+    return list(user_ids)
+
 # ==============================
 # BOTS
 # ==============================
