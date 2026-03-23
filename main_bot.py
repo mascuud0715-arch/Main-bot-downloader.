@@ -125,12 +125,11 @@ def handle_all(message):
         except Exception as e:
             print("TOKEN ERROR:", e)
             bot.send_message(message.chat.id, "❌ Invalid token")
-
-    # ======================
+            
+# ======================
 # PLATFORM STEP
 # ======================
 elif isinstance(step, dict):
-    # 🔥 normalize platform
     platform = message.text.lower().strip()
 
     if platform == "x":
