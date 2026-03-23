@@ -197,4 +197,3 @@ def handle_all(message):
         main_menu(message.chat.id)
 
     print("🚀 Main bot running...")
-    bot.infinity_polling(skip_pending=True)
