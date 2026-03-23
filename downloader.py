@@ -2,6 +2,7 @@ import yt_dlp
 import os
 import uuid
 import requests
+from io import BytesIO
 
 # ==============================
 # CREATE DOWNLOAD FOLDER
@@ -16,9 +17,15 @@ def expand_url(url):
     try:
         if any(x in url for x in ["vt.tiktok.com", "vm.tiktok.com", "t.co"]):
             r = requests.get(url, allow_redirects=True, timeout=10)
-            return r.url
+            url = r.url
+
+        # 🔥 FIX X → Twitter
+        if "x.com" in url:
+            url = url.replace("x.com", "twitter.com")
+
     except Exception as e:
         print("EXPAND ERROR:", e)
+
     return url
 
 # ==============================
@@ -32,26 +39,25 @@ def tiktok_api_download(url):
         if r.get("data"):
             data = r["data"]
 
-            video_url = data.get("play")
-            images = data.get("images")
-
             videos = []
-            imgs = []
+            images = []
 
-            # video
-            if video_url:
-                videos.append(video_url)
+            # VIDEO
+            if data.get("play"):
+                video_data = requests.get(data["play"], timeout=10).content
+                videos.append(BytesIO(video_data))
 
-            # images (slideshow)
-            if images:
-                for img in images:
-                    imgs.append(img)
+            # IMAGES (slideshow)
+            if data.get("images"):
+                for img_url in data["images"]:
+                    img_data = requests.get(img_url, timeout=10).content
+                    images.append(BytesIO(img_data))
 
-            if videos or imgs:
+            if videos or images:
                 return {
                     "status": True,
                     "videos": videos,
-                    "images": imgs
+                    "images": images
                 }
 
         return {"status": False}
@@ -65,10 +71,27 @@ def tiktok_api_download(url):
 # ==============================
 def download_video(url, platform="unknown"):
     try:
-        # expand links
+        # ==============================
+        # EXPAND URL
+        # ==============================
         url = expand_url(url)
         print("FINAL URL:", url)
 
+        # ==============================
+        # 🔒 PLATFORM FILTER (MUHIIM)
+        # ==============================
+        if platform == "tiktok" and "tiktok.com" not in url:
+            return {"status": False}
+
+        if platform == "instagram" and "instagram.com" not in url:
+            return {"status": False}
+
+        if platform == "twitter" and "twitter.com" not in url:
+            return {"status": False}
+
+        # ==============================
+        # FILE SETUP
+        # ==============================
         file_id = str(uuid.uuid4())
         base_path = os.path.join("downloads", file_id)
 
@@ -76,24 +99,25 @@ def download_video(url, platform="unknown"):
         images = []
 
         # ==============================
-        # YT-DLP OPTIONS
+        # YT-DLP OPTIONS (🔥 optimized)
         # ==============================
         ydl_opts = {
             "outtmpl": base_path + ".%(ext)s",
-            "format": "bestvideo+bestaudio/best",
+            "format": "best",
             "noplaylist": True,
             "quiet": True,
             "nocheckcertificate": True,
+            "http_headers": {
+                "User-Agent": "Mozilla/5.0"
+            }
         }
-
-        info = None
 
         # ==============================
         # TRY YT-DLP
         # ==============================
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
+                ydl.extract_info(url, download=True)
         except Exception as e:
             print("YTDLP ERROR:", e)
 
@@ -104,14 +128,21 @@ def download_video(url, platform="unknown"):
             if file.startswith(file_id):
                 full_path = os.path.join("downloads", file)
 
-                if file.endswith((".mp4", ".mkv", ".webm")):
-                    videos.append(open(full_path, "rb"))
+                try:
+                    with open(full_path, "rb") as f:
+                        data = f.read()
 
-                elif file.endswith((".jpg", ".jpeg", ".png")):
-                    images.append(open(full_path, "rb"))
+                    if file.endswith((".mp4", ".mkv", ".webm")):
+                        videos.append(BytesIO(data))
+
+                    elif file.endswith((".jpg", ".jpeg", ".png")):
+                        images.append(BytesIO(data))
+
+                except Exception as e:
+                    print("FILE READ ERROR:", e)
 
         # ==============================
-        # IF YT-DLP FAILED → TIKTOK API
+        # TIKTOK FALLBACK
         # ==============================
         if not videos and not images and "tiktok.com" in url:
             print("Using TikTok API fallback...")
