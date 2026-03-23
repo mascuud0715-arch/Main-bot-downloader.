@@ -24,18 +24,31 @@ def clean_token(token):
     return token.replace(" ", "").strip()
 
 # ==============================
-# 🔥 EXTRACT URL (FINAL FIX)
+# 🔥 EXTRACT URL (ULTRA FIX)
 # ==============================
 def extract_url(message):
     text = ""
 
+    # TEXT
     if message.text:
-        text = message.text
+        text += message.text + " "
 
-    elif message.caption:
-        text = message.caption
+    # CAPTION
+    if message.caption:
+        text += message.caption + " "
 
-    # 🔥 find ALL urls
+    # 🔥 ENTITY URL (forwarded fix)
+    if message.entities:
+        for e in message.entities:
+            if e.type == "url":
+                return message.text[e.offset:e.offset + e.length]
+
+    if message.caption_entities:
+        for e in message.caption_entities:
+            if e.type == "url":
+                return message.caption[e.offset:e.offset + e.length]
+
+    # 🔥 REGEX
     urls = re.findall(r'(https?://[^\s]+)', text)
 
     if urls:
@@ -44,13 +57,14 @@ def extract_url(message):
     return None
 
 # ==============================
-# PLATFORM CHECK
+# PLATFORM CHECK (FIXED)
 # ==============================
 def is_valid_platform(url, platform):
     if not url:
         return False
 
     url = url.lower().strip().replace(" ", "")
+    platform = platform.lower().strip()  # 🔥 muhiim
 
     if platform == "tiktok":
         return any(x in url for x in [
@@ -103,6 +117,7 @@ def run_bot(bot):
 def start_user_bot(token, platform):
     try:
         token = clean_token(token)
+        platform = platform.lower().strip()  # 🔥 fix muhiim
 
         if not token or ":" not in token:
             print("❌ Invalid token:", token)
@@ -116,7 +131,9 @@ def start_user_bot(token, platform):
 
         print(f"🚀 Bot started: {token[:10]} ({platform})")
 
+        # ==============================
         # START
+        # ==============================
         @bot.message_handler(commands=['start'])
         def start(message):
             user_id = message.chat.id
@@ -136,7 +153,9 @@ def start_user_bot(token, platform):
                 reply_markup=kb
             )
 
+        # ==============================
         # CREATE BUTTON
+        # ==============================
         @bot.message_handler(func=lambda m: m.text == "🤖 Create your bot")
         def create_bot(message):
             kb = InlineKeyboardMarkup()
@@ -149,15 +168,14 @@ def start_user_bot(token, platform):
             bot.send_message(message.chat.id, "Click below 👇", reply_markup=kb)
 
         # ==============================
-        # HANDLE 🔥 FINAL
+        # HANDLE
         # ==============================
         @bot.message_handler(content_types=['text', 'photo', 'video'])
         def handle(message):
             user_id = message.chat.id
 
             url = extract_url(message)
-
-            print("URL:", url)  # DEBUG
+            print("EXTRACTED URL:", url)
 
             if not url:
                 bot.send_message(user_id, "❌ Send valid link")
@@ -192,7 +210,7 @@ def start_user_bot(token, platform):
 
                     username = bot.get_me().username
 
-                    # ===== VIDEO =====
+                    # VIDEO
                     if videos:
                         for i, v in enumerate(videos):
                             if i == len(videos) - 1:
@@ -204,7 +222,7 @@ def start_user_bot(token, platform):
                             else:
                                 bot.send_video(user_id, v)
 
-                    # ===== IMAGE =====
+                    # IMAGES
                     elif images:
                         for i, img in enumerate(images):
                             if i == len(images) - 1:
