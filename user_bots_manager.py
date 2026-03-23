@@ -27,22 +27,60 @@ def clean_token(token):
 # PLATFORM CHECK 🔥
 # ==============================
 def is_valid_platform(url, platform):
-    url = url.lower()
+    if not url:
+        return False
 
+    url = url.lower().strip()
+
+    # 🔥 remove spaces
+    url = url.replace(" ", "")
+
+    # ==============================
+    # TIKTOK
+    # ==============================
     if platform == "tiktok":
-        return "tiktok.com" in url
+        return any(x in url for x in [
+            "tiktok.com",
+            "vt.tiktok.com",
+            "vm.tiktok.com"
+        ])
 
+    # ==============================
+    # INSTAGRAM
+    # ==============================
     elif platform == "instagram":
-        return "instagram.com" in url
+        return any(x in url for x in [
+            "instagram.com",
+            "instagr.am"
+        ])
 
+    # ==============================
+    # FACEBOOK
+    # ==============================
     elif platform == "facebook":
-        return "facebook.com" in url or "fb.watch" in url
+        return any(x in url for x in [
+            "facebook.com",
+            "fb.watch",
+            "fb.com"
+        ])
 
+    # ==============================
+    # YOUTUBE
+    # ==============================
     elif platform == "youtube":
-        return "youtube.com" in url or "youtu.be" in url
+        return any(x in url for x in [
+            "youtube.com",
+            "youtu.be"
+        ])
 
+    # ==============================
+    # TWITTER / X
+    # ==============================
     elif platform == "twitter":
-        return "twitter.com" in url or "x.com" in url
+        return any(x in url for x in [
+            "twitter.com",
+            "x.com"
+        ])
 
     return False
 
