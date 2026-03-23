@@ -3,22 +3,23 @@ import os
 import uuid
 import requests
 from io import BytesIO
-import re
 
 DOWNLOAD_DIR = "downloads"
 
 if not os.path.exists(DOWNLOAD_DIR):
     os.makedirs(DOWNLOAD_DIR)
 
+HEADERS = {
+    "User-Agent": "Mozilla/5.0"
+}
+
 # ==============================
-# EXPAND URL (STRONG)
+# EXPAND URL
 # ==============================
 def expand_url(url):
     try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-
         if any(x in url for x in ["vt.tiktok.com", "vm.tiktok.com", "t.co"]):
-            url = requests.get(url, headers=headers, allow_redirects=True, timeout=10).url
+            url = requests.get(url, headers=HEADERS, allow_redirects=True, timeout=15).url
 
         if "x.com" in url:
             url = url.replace("x.com", "twitter.com")
@@ -41,28 +42,28 @@ def check_platform(url, platform):
 
 
 # ==============================
-# 🔥 TIKTOK (ULTRA FIX)
+# 🔥 TIKTOK (SUPER STABLE)
 # ==============================
 def tiktok_api(url):
     try:
-        api = f"https://www.tikwm.com/api/?url={url}"
-        r = requests.get(api, timeout=15).json()
-
         videos = []
         images = []
+
+        api = f"https://tikwm.com/api/?url={url}"
+        r = requests.get(api, headers=HEADERS, timeout=15).json()
 
         if r.get("data"):
             d = r["data"]
 
             # VIDEO
             if d.get("play"):
-                video = requests.get(d["play"], timeout=15).content
+                video = requests.get(d["play"], headers=HEADERS, timeout=15).content
                 videos.append(BytesIO(video))
 
-            # IMAGES (slideshow)
+            # SLIDESHOW
             if d.get("images"):
                 for img in d["images"]:
-                    image = requests.get(img, timeout=15).content
+                    image = requests.get(img, headers=HEADERS, timeout=15).content
                     images.append(BytesIO(image))
 
         if videos or images:
@@ -76,18 +77,46 @@ def tiktok_api(url):
 
 
 # ==============================
-# INSTAGRAM (WORKING)
+# 🔥 TWITTER/X (NEW API)
+# ==============================
+def twitter_api(url):
+    try:
+        videos = []
+
+        api = f"https://api.savetwitter.net/api/twitter/video?url={url}"
+        r = requests.get(api, headers=HEADERS, timeout=15).json()
+
+        if r.get("data"):
+            for v in r["data"]:
+                link = v.get("url")
+                if link:
+                    video = requests.get(link, headers=HEADERS, timeout=15).content
+                    videos.append(BytesIO(video))
+                    break
+
+        if videos:
+            return {"status": True, "videos": videos, "images": []}
+
+        return {"status": False}
+
+    except Exception as e:
+        print("TW ERROR:", e)
+        return {"status": False}
+
+
+# ==============================
+# INSTAGRAM
 # ==============================
 def instagram_api(url):
     try:
-        r = requests.get(f"https://igram.world/api/ig?url={url}", timeout=10).json()
+        r = requests.get(f"https://igram.world/api/ig?url={url}", headers=HEADERS, timeout=15).json()
 
         videos = []
         images = []
 
         if r.get("media"):
             for m in r["media"]:
-                data = requests.get(m["url"]).content
+                data = requests.get(m["url"], headers=HEADERS, timeout=15).content
                 if m.get("type") == "video":
                     videos.append(BytesIO(data))
                 else:
@@ -104,42 +133,14 @@ def instagram_api(url):
 
 
 # ==============================
-# 🔥 TWITTER/X FIXED
-# ==============================
-def twitter_api(url):
-    try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-
-        # NEW API (working)
-        api = f"https://api.savetwitter.net/api/twitter/video?url={url}"
-        r = requests.get(api, headers=headers, timeout=15).json()
-
-        videos = []
-
-        if r.get("data"):
-            for v in r["data"]:
-                link = v.get("url")
-                if link:
-                    video = requests.get(link, timeout=15).content
-                    videos.append(BytesIO(video))
-                    break
-
-        if videos:
-            return {"status": True, "videos": videos, "images": []}
-
-        return {"status": False}
-
-    except Exception as e:
-        print("TW ERROR:", e)
-        return {"status": False}
-
-
-# ==============================
-# MAIN
+# MAIN FUNCTION
 # ==============================
 def download_video(url, platform):
     try:
         url = expand_url(url)
+
+        print("URL:", url)
+        print("PLATFORM:", platform)
 
         if not check_platform(url, platform):
             return {
@@ -147,7 +148,25 @@ def download_video(url, platform):
                 "error": f"This bot allow only {platform} links!"
             }
 
-        # 1️⃣ TRY yt-dlp
+        # 🔥 DIRECT API FIRST (IMPORTANT)
+        if platform == "tiktok":
+            res = tiktok_api(url)
+            if res["status"]:
+                return res
+
+        elif platform == "twitter":
+            res = twitter_api(url)
+            if res["status"]:
+                return res
+
+        elif platform == "instagram":
+            res = instagram_api(url)
+            if res["status"]:
+                return res
+
+        # ==============================
+        # yt-dlp fallback
+        # ==============================
         file_id = str(uuid.uuid4())
         base = os.path.join(DOWNLOAD_DIR, file_id)
 
@@ -164,8 +183,8 @@ def download_video(url, platform):
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.extract_info(url, download=True)
 
-        except:
-            pass
+        except Exception as e:
+            print("YTDLP ERROR:", e)
 
         # READ FILES
         for f in os.listdir(DOWNLOAD_DIR):
@@ -175,22 +194,10 @@ def download_video(url, platform):
 
                 if f.endswith((".mp4", ".webm")):
                     videos.append(BytesIO(data))
+
                 elif f.endswith((".jpg", ".png", ".jpeg")):
                     images.append(BytesIO(data))
 
-        # 2️⃣ FALLBACK
-        if not videos and not images:
-
-            if platform == "tiktok":
-                return tiktok_api(url)
-
-            elif platform == "instagram":
-                return instagram_api(url)
-
-            elif platform == "twitter":
-                return twitter_api(url)
-
-        # RESULT
         if videos or images:
             return {"status": True, "videos": videos, "images": images}
 
