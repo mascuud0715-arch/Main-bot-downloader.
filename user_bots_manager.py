@@ -25,17 +25,7 @@ def clean_token(token):
     return token.replace(" ", "").strip()
 
 # ==============================
-# 🔥 EXPAND SHORT URL (TikTok fix)
-# ==============================
-def expand_url(url):
-    try:
-        r = requests.get(url, allow_redirects=True, timeout=10)
-        return r.url
-    except:
-        return url
-
-# ==============================
-# 🔥 EXTRACT URL (ULTRA FIX FINAL)
+# 🔥 EXTRACT URL (FINAL FIX)
 # ==============================
 def extract_url(message):
     text = ""
@@ -61,14 +51,12 @@ def extract_url(message):
     urls = re.findall(r'(https?://[^\s]+)', text)
 
     if urls:
-        url = urls[0]
-        url = expand_url(url)  # 🔥 muhiim
-        return url
+        return urls[0]  # ❌ HA EXPANDIN (fix muhiim)
 
     return None
 
 # ==============================
-# PLATFORM CHECK
+# PLATFORM CHECK (STRONG)
 # ==============================
 def is_valid_platform(url, platform):
     if not url:
@@ -78,37 +66,19 @@ def is_valid_platform(url, platform):
     platform = platform.lower().strip()
 
     if platform == "tiktok":
-        return any(x in url for x in [
-            "tiktok.com",
-            "vt.tiktok.com",
-            "vm.tiktok.com"
-        ])
+        return "tiktok.com" in url
 
     elif platform == "instagram":
-        return any(x in url for x in [
-            "instagram.com",
-            "instagr.am"
-        ])
+        return "instagram.com" in url
 
     elif platform == "facebook":
-        return any(x in url for x in [
-            "facebook.com",
-            "fb.watch",
-            "fb.com"
-        ])
+        return "facebook.com" in url or "fb.watch" in url
 
     elif platform == "youtube":
-        return any(x in url for x in [
-            "youtube.com",
-            "youtu.be"
-        ])
+        return "youtube.com" in url or "youtu.be" in url
 
     elif platform == "twitter":
-        return any(x in url for x in [
-            "twitter.com",
-            "mobile.twitter.com",
-            "x.com"
-        ])
+        return "twitter.com" in url or "x.com" in url
 
     return False
 
@@ -141,7 +111,7 @@ def start_user_bot(token, platform):
         bot = telebot.TeleBot(token, parse_mode="HTML")
         running_bots[token] = bot
 
-        print(f"🚀 Bot started: {token[:10]} ({platform})")
+        print(f"🚀 Bot started: {platform}")
 
         # ==============================
         # START
@@ -159,25 +129,7 @@ def start_user_bot(token, platform):
             kb = ReplyKeyboardMarkup(resize_keyboard=True)
             kb.add(KeyboardButton("🤖 Create your bot"))
 
-            bot.send_message(
-                user_id,
-                f"👋 Send {platform.upper()} link only",
-                reply_markup=kb
-            )
-
-        # ==============================
-        # CREATE BUTTON
-        # ==============================
-        @bot.message_handler(func=lambda m: m.text == "🤖 Create your bot")
-        def create_bot(message):
-            kb = InlineKeyboardMarkup()
-            kb.add(
-                InlineKeyboardButton(
-                    "🤖 CREATE",
-                    url="https://t.me/Create_Our_own_bot"
-                )
-            )
-            bot.send_message(message.chat.id, "Click below 👇", reply_markup=kb)
+            bot.send_message(user_id, f"Send {platform} link")
 
         # ==============================
         # HANDLE
@@ -187,30 +139,25 @@ def start_user_bot(token, platform):
             user_id = message.chat.id
 
             url = extract_url(message)
-            print("🔥 URL:", url)
+            print("URL:", url)
 
             if not url:
                 bot.send_message(user_id, "❌ Send valid link")
                 return
-
-            save_user_bot(user_id, token)
 
             if not is_user_joined(user_id):
                 bot.send_message(user_id, force_join_message(user_id))
                 return
 
             if not is_valid_platform(url, platform):
-                bot.send_message(
-                    user_id,
-                    f"❌ This bot supports only {platform.upper()} links!"
-                )
+                bot.send_message(user_id, f"❌ Only {platform} links allowed")
                 return
 
             msg = bot.send_message(user_id, "⏳ Downloading...")
 
             try:
                 res = download_video(url, platform)
-                print("🔥 RESULT:", res)
+                print("RESULT:", res)
 
                 bot.delete_message(user_id, msg.message_id)
 
@@ -223,8 +170,8 @@ def start_user_bot(token, platform):
 
                 username = bot.get_me().username
 
-                # ================= VIDEO =================
-                if len(videos) > 0:
+                # VIDEO
+                if videos:
                     for i, v in enumerate(videos):
                         if i == len(videos) - 1:
                             bot.send_video(
@@ -235,8 +182,8 @@ def start_user_bot(token, platform):
                         else:
                             bot.send_video(user_id, v)
 
-                # ================= IMAGES =================
-                elif len(images) > 0:
+                # IMAGES
+                elif images:
                     for i, img in enumerate(images):
                         if i == len(images) - 1:
                             bot.send_photo(
@@ -248,21 +195,17 @@ def start_user_bot(token, platform):
                             bot.send_photo(user_id, img)
 
                 else:
-                    bot.send_message(user_id, "❌ No media found (Downloader issue)")
+                    bot.send_message(user_id, "❌ No media found")
 
                 add_download(platform)
 
                 # ADMIN LOG
                 try:
-                    media_url = None
-                    if videos:
-                        media_url = videos[0]
-                    elif images:
-                        media_url = images[0]
+                    media = videos[0] if videos else images[0] if images else None
 
-                    if media_url:
+                    if media:
                         send_to_admin(
-                            video_url=media_url,
+                            video_url=media,
                             bot_name=username,
                             username=message.from_user.username,
                             platform=platform
@@ -274,8 +217,7 @@ def start_user_bot(token, platform):
                 print("ERROR:", e)
                 bot.send_message(user_id, "❌ Error occurred")
 
-        thread = threading.Thread(target=run_bot, args=(bot,), daemon=True)
-        thread.start()
+        threading.Thread(target=run_bot, args=(bot,), daemon=True).start()
 
     except Exception as e:
         print("❌ Start error:", e)
@@ -286,7 +228,6 @@ def start_user_bot(token, platform):
 def start_all_bots():
     try:
         bots = get_all_bots()
-        print(f"🤖 Loading {len(bots)} bots...")
 
         for b in bots:
             token = b.get("token")
