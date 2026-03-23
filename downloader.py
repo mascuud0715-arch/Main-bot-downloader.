@@ -7,8 +7,10 @@ from io import BytesIO
 # ==============================
 # CREATE DOWNLOAD FOLDER
 # ==============================
-if not os.path.exists("downloads"):
-    os.makedirs("downloads")
+DOWNLOAD_DIR = "downloads"
+
+if not os.path.exists(DOWNLOAD_DIR):
+    os.makedirs(DOWNLOAD_DIR)
 
 # ==============================
 # EXPAND SHORT LINKS
@@ -19,7 +21,7 @@ def expand_url(url):
             r = requests.get(url, allow_redirects=True, timeout=10)
             url = r.url
 
-        # 🔥 FIX X → Twitter
+        # FIX X → Twitter
         if "x.com" in url:
             url = url.replace("x.com", "twitter.com")
 
@@ -29,7 +31,7 @@ def expand_url(url):
     return url
 
 # ==============================
-# TIKTOK API FALLBACK (🔥 muhiim)
+# TIKTOK API FALLBACK (SAFE)
 # ==============================
 def tiktok_api_download(url):
     try:
@@ -67,6 +69,21 @@ def tiktok_api_download(url):
         return {"status": False}
 
 # ==============================
+# PLATFORM CHECK (VERY STRONG 🔒)
+# ==============================
+def is_valid_platform(url, platform):
+    if platform == "tiktok":
+        return "tiktok.com" in url
+
+    elif platform == "instagram":
+        return "instagram.com" in url
+
+    elif platform == "twitter":
+        return "twitter.com" in url
+
+    return False
+
+# ==============================
 # MAIN DOWNLOAD FUNCTION
 # ==============================
 def download_video(url, platform="unknown"):
@@ -76,30 +93,26 @@ def download_video(url, platform="unknown"):
         # ==============================
         url = expand_url(url)
         print("FINAL URL:", url)
+        print("PLATFORM:", platform)
 
         # ==============================
-        # 🔒 PLATFORM FILTER (MUHIIM)
+        # 🔒 HARD PLATFORM LOCK
         # ==============================
-        if platform == "tiktok" and "tiktok.com" not in url:
-            return {"status": False}
-
-        if platform == "instagram" and "instagram.com" not in url:
-            return {"status": False}
-
-        if platform == "twitter" and "twitter.com" not in url:
+        if not is_valid_platform(url, platform):
+            print("BLOCKED: WRONG PLATFORM")
             return {"status": False}
 
         # ==============================
         # FILE SETUP
         # ==============================
         file_id = str(uuid.uuid4())
-        base_path = os.path.join("downloads", file_id)
+        base_path = os.path.join(DOWNLOAD_DIR, file_id)
 
         videos = []
         images = []
 
         # ==============================
-        # YT-DLP OPTIONS (🔥 optimized)
+        # YT-DLP OPTIONS
         # ==============================
         ydl_opts = {
             "outtmpl": base_path + ".%(ext)s",
@@ -124,9 +137,9 @@ def download_video(url, platform="unknown"):
         # ==============================
         # COLLECT FILES
         # ==============================
-        for file in os.listdir("downloads"):
+        for file in os.listdir(DOWNLOAD_DIR):
             if file.startswith(file_id):
-                full_path = os.path.join("downloads", file)
+                full_path = os.path.join(DOWNLOAD_DIR, file)
 
                 try:
                     with open(full_path, "rb") as f:
@@ -142,9 +155,14 @@ def download_video(url, platform="unknown"):
                     print("FILE READ ERROR:", e)
 
         # ==============================
-        # TIKTOK FALLBACK
+        # 🔥 SAFE TIKTOK FALLBACK (LOCKED)
         # ==============================
-        if not videos and not images and "tiktok.com" in url:
+        if (
+            platform == "tiktok"
+            and "tiktok.com" in url
+            and not videos
+            and not images
+        ):
             print("Using TikTok API fallback...")
             return tiktok_api_download(url)
 
@@ -158,6 +176,7 @@ def download_video(url, platform="unknown"):
                 "images": images
             }
 
+        print("NO MEDIA FOUND")
         return {"status": False}
 
     except Exception as e:
