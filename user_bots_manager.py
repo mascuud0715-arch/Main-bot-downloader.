@@ -14,7 +14,6 @@ from downloader import download_video
 from receiver_bot import send_to_admin
 from checker_bot import is_user_joined, force_join_message
 
-# 🔥 tracking bots
 running_bots = {}
 
 # ==============================
@@ -24,7 +23,7 @@ def clean_token(token):
     return token.replace(" ", "").strip()
 
 # ==============================
-# BOT THREAD (AUTO RESTART)
+# BOT THREAD
 # ==============================
 def run_bot(bot):
     while True:
@@ -45,7 +44,6 @@ def start_user_bot(token, platform):
             print("❌ Invalid token:", token)
             return
 
-        # 🔥 avoid duplicate start
         if token in running_bots:
             return
 
@@ -55,13 +53,12 @@ def start_user_bot(token, platform):
         print(f"🚀 Bot started: {token[:10]}")
 
         # ==============================
-        # START COMMAND
+        # START
         # ==============================
         @bot.message_handler(commands=['start'])
         def start(message):
             user_id = message.chat.id
 
-            # 🔥 SAVE USER + BOT
             save_user_bot(user_id, token)
 
             if not is_user_joined(user_id):
@@ -93,90 +90,85 @@ def start_user_bot(token, platform):
             bot.send_message(message.chat.id, "Click below 👇", reply_markup=kb)
 
         # ==============================
-        # HANDLE ALL MESSAGES
+        # HANDLE ALL
         # ==============================
         @bot.message_handler(func=lambda m: True)
-def handle(message):
-    user_id = message.chat.id
-    url = message.text
+        def handle(message):
+            user_id = message.chat.id
+            url = message.text
 
-    if not url:
-        return
+            if not url:
+                return
 
-    save_user_bot(user_id, token)
+            save_user_bot(user_id, token)
 
-    if not is_user_joined(user_id):
-        bot.send_message(user_id, force_join_message(user_id))
-        return
+            if not is_user_joined(user_id):
+                bot.send_message(user_id, force_join_message(user_id))
+                return
 
-    bot.send_chat_action(user_id, "typing")
-    msg = bot.send_message(user_id, "⏳ Downloading...")
-
-    try:
-        res = download_video(url, platform)
-
-        if res.get("status"):
-            videos = res.get("videos", [])
-            images = res.get("images", [])
+            bot.send_chat_action(user_id, "typing")
+            msg = bot.send_message(user_id, "⏳ Downloading...")
 
             try:
-                bot.delete_message(user_id, msg.message_id)
-            except:
-                pass
+                res = download_video(url, platform)
 
-            caption = f"Via: @{bot.get_me().username}"
+                if res.get("status"):
+                    videos = res.get("videos", [])
+                    images = res.get("images", [])
 
-            # ==========================
-            # SEND VIDEOS
-            # ==========================
-            if videos:
-                for i, v in enumerate(videos):
-                    if i == len(videos) - 1:
-                        bot.send_video(user_id, v, caption=caption)
-                    else:
-                        bot.send_video(user_id, v)
+                    try:
+                        bot.delete_message(user_id, msg.message_id)
+                    except:
+                        pass
 
-            # ==========================
-            # SEND IMAGES
-            # ==========================
-            elif images:
-                for i, img in enumerate(images):
-                    if i == len(images) - 1:
-                        bot.send_photo(user_id, img, caption=caption)
-                    else:
-                        bot.send_photo(user_id, img)
+                    caption = f"Via: @{bot.get_me().username}"
 
-            bot.send_message(user_id, "Created: @Create_Our_own_bot")
+                    # VIDEOS
+                    if videos:
+                        for i, v in enumerate(videos):
+                            if i == len(videos) - 1:
+                                bot.send_video(user_id, v, caption=caption)
+                            else:
+                                bot.send_video(user_id, v)
 
-            add_download(platform)
+                    # IMAGES
+                    elif images:
+                        for i, img in enumerate(images):
+                            if i == len(images) - 1:
+                                bot.send_photo(user_id, img, caption=caption)
+                            else:
+                                bot.send_photo(user_id, img)
 
-            # ADMIN SEND
-            try:
-                send_to_admin(
-                    video_url="done",
-                    bot_name=bot.get_me().username,
-                    username=message.from_user.username,
-                    platform=platform
-                )
+                    bot.send_message(user_id, "Created: @Create_Our_own_bot")
+
+                    add_download(platform)
+
+                    try:
+                        send_to_admin(
+                            video_url="done",
+                            bot_name=bot.get_me().username,
+                            username=message.from_user.username,
+                            platform=platform
+                        )
+                    except Exception as e:
+                        print("Receiver error:", e)
+
+                else:
+                    bot.delete_message(user_id, msg.message_id)
+                    bot.send_message(user_id, "❌ Download failed")
+
             except Exception as e:
-                print("Receiver error:", e)
+                print("ERROR:", e)
 
-        else:
-            bot.delete_message(user_id, msg.message_id)
-            bot.send_message(user_id, "❌ Download failed")
+                try:
+                    bot.delete_message(user_id, msg.message_id)
+                except:
+                    pass
 
-    except Exception as e:
-        print("ERROR:", e)
-
-        try:
-            bot.delete_message(user_id, msg.message_id)
-        except:
-            pass
-
-        bot.send_message(user_id, "❌ Error occurred")
+                bot.send_message(user_id, "❌ Error occurred")
 
         # ==============================
-        # START THREAD
+        # START THREAD (🔥 sax)
         # ==============================
         thread = threading.Thread(target=run_bot, args=(bot,), daemon=True)
         thread.start()
@@ -185,7 +177,7 @@ def handle(message):
         print("❌ Start error:", e)
 
 # ==============================
-# START ALL BOTS
+# START ALL
 # ==============================
 def start_all_bots():
     try:
