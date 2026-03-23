@@ -28,19 +28,23 @@ def clean_token(token):
 # 🔥 EXTRACT URL (FINAL FIX)
 # ==============================
 def extract_url(message):
-    # 1. TEXT
+    text = ""
+
+    # TEXT + CAPTION isku dar
     if message.text:
-        urls = re.findall(r'(https?://[^\s]+)', message.text)
-        if urls:
-            return urls[0]
+        text += message.text + " "
 
-    # 2. CAPTION (🔥 muhiim u ah forward)
     if message.caption:
-        urls = re.findall(r'(https?://[^\s]+)', message.caption)
-        if urls:
-            return urls[0]
+        text += message.caption + " "
 
-    # 3. ENTITY (backup)
+    # 🔥 Forward preview fix (MOST IMPORTANT)
+    if message.forward_from or message.forward_from_chat:
+        if message.text:
+            text += message.text + " "
+        if message.caption:
+            text += message.caption + " "
+
+    # ENTITY (backup)
     if message.entities:
         for e in message.entities:
             if e.type == "url":
@@ -50,6 +54,18 @@ def extract_url(message):
         for e in message.caption_entities:
             if e.type == "url":
                 return message.caption[e.offset:e.offset + e.length]
+
+    # 🔥 REGEX STRONG (X + TikTok + IG)
+    urls = re.findall(r'(https?://[^\s]+)', text)
+
+    if urls:
+        url = urls[0]
+
+        # 🔥 CLEAN URL (important)
+        url = url.split("?")[0]
+        url = url.strip()
+
+        return url
 
     return None
 
