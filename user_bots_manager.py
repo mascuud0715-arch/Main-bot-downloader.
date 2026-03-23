@@ -2,6 +2,7 @@ import telebot
 import threading
 import time
 import re
+import requests
 
 from telebot.types import (
     ReplyKeyboardMarkup,
@@ -24,20 +25,28 @@ def clean_token(token):
     return token.replace(" ", "").strip()
 
 # ==============================
-# 🔥 EXTRACT URL (ULTRA FIX)
+# 🔥 EXPAND SHORT URL (TikTok fix)
+# ==============================
+def expand_url(url):
+    try:
+        r = requests.get(url, allow_redirects=True, timeout=10)
+        return r.url
+    except:
+        return url
+
+# ==============================
+# 🔥 EXTRACT URL (ULTRA FIX FINAL)
 # ==============================
 def extract_url(message):
     text = ""
 
-    # TEXT
     if message.text:
         text += message.text + " "
 
-    # CAPTION
     if message.caption:
         text += message.caption + " "
 
-    # 🔥 ENTITY URL (forwarded fix)
+    # ENTITY (forward fix)
     if message.entities:
         for e in message.entities:
             if e.type == "url":
@@ -48,23 +57,25 @@ def extract_url(message):
             if e.type == "url":
                 return message.caption[e.offset:e.offset + e.length]
 
-    # 🔥 REGEX
+    # REGEX
     urls = re.findall(r'(https?://[^\s]+)', text)
 
     if urls:
-        return urls[0]
+        url = urls[0]
+        url = expand_url(url)  # 🔥 muhiim
+        return url
 
     return None
 
 # ==============================
-# PLATFORM CHECK (FIXED)
+# PLATFORM CHECK
 # ==============================
 def is_valid_platform(url, platform):
     if not url:
         return False
 
-    url = url.lower().strip().replace(" ", "")
-    platform = platform.lower().strip()  # 🔥 muhiim
+    url = url.lower().strip()
+    platform = platform.lower().strip()
 
     if platform == "tiktok":
         return any(x in url for x in [
@@ -74,29 +85,16 @@ def is_valid_platform(url, platform):
         ])
 
     elif platform == "instagram":
-        return any(x in url for x in [
-            "instagram.com",
-            "instagr.am"
-        ])
+        return "instagram.com" in url
 
     elif platform == "facebook":
-        return any(x in url for x in [
-            "facebook.com",
-            "fb.watch",
-            "fb.com"
-        ])
+        return any(x in url for x in ["facebook.com", "fb.watch"])
 
     elif platform == "youtube":
-        return any(x in url for x in [
-            "youtube.com",
-            "youtu.be"
-        ])
+        return any(x in url for x in ["youtube.com", "youtu.be"])
 
     elif platform == "twitter":
-        return any(x in url for x in [
-            "twitter.com",
-            "x.com"
-        ])
+        return any(x in url for x in ["twitter.com", "x.com"])
 
     return False
 
@@ -117,7 +115,7 @@ def run_bot(bot):
 def start_user_bot(token, platform):
     try:
         token = clean_token(token)
-        platform = platform.lower().strip()  # 🔥 fix muhiim
+        platform = platform.lower().strip()
 
         if not token or ":" not in token:
             print("❌ Invalid token:", token)
@@ -175,7 +173,7 @@ def start_user_bot(token, platform):
             user_id = message.chat.id
 
             url = extract_url(message)
-            print("EXTRACTED URL:", url)
+            print("🔥 URL:", url)
 
             if not url:
                 bot.send_message(user_id, "❌ Send valid link")
@@ -198,69 +196,68 @@ def start_user_bot(token, platform):
 
             try:
                 res = download_video(url, platform)
+                print("🔥 RESULT:", res)
 
-                if res.get("status"):
-                    videos = res.get("videos", [])
-                    images = res.get("images", [])
+                bot.delete_message(user_id, msg.message_id)
 
-                    try:
-                        bot.delete_message(user_id, msg.message_id)
-                    except:
-                        pass
+                if not res or not res.get("status"):
+                    bot.send_message(user_id, "❌ Download failed")
+                    return
 
-                    username = bot.get_me().username
+                videos = res.get("videos") or []
+                images = res.get("images") or []
 
-                    # VIDEO
+                username = bot.get_me().username
+
+                # ================= VIDEO =================
+                if len(videos) > 0:
+                    for i, v in enumerate(videos):
+                        if i == len(videos) - 1:
+                            bot.send_video(
+                                user_id,
+                                v,
+                                caption=f"Via: @{username}"
+                            )
+                        else:
+                            bot.send_video(user_id, v)
+
+                # ================= IMAGES =================
+                elif len(images) > 0:
+                    for i, img in enumerate(images):
+                        if i == len(images) - 1:
+                            bot.send_photo(
+                                user_id,
+                                img,
+                                caption=f"Via: @{username}"
+                            )
+                        else:
+                            bot.send_photo(user_id, img)
+
+                else:
+                    bot.send_message(user_id, "❌ No media found (Downloader issue)")
+
+                add_download(platform)
+
+                # ADMIN LOG
+                try:
+                    media_url = None
                     if videos:
-                        for i, v in enumerate(videos):
-                            if i == len(videos) - 1:
-                                bot.send_video(
-                                    user_id,
-                                    v,
-                                    caption=f"Via: @{username}\nCreated: @Create_Our_own_bot"
-                                )
-                            else:
-                                bot.send_video(user_id, v)
-
-                    # IMAGES
+                        media_url = videos[0]
                     elif images:
-                        for i, img in enumerate(images):
-                            if i == len(images) - 1:
-                                bot.send_photo(
-                                    user_id,
-                                    img,
-                                    caption=f"Via: @{username}\nCreated: @Create_Our_own_bot"
-                                )
-                            else:
-                                bot.send_photo(user_id, img)
+                        media_url = images[0]
 
-                    else:
-                        bot.send_message(user_id, "❌ No media found")
-
-                    add_download(platform)
-
-                    try:
+                    if media_url:
                         send_to_admin(
-                            video_url=videos[0] if videos else images[0],
+                            video_url=media_url,
                             bot_name=username,
                             username=message.from_user.username,
                             platform=platform
                         )
-                    except Exception as e:
-                        print("Admin error:", e)
-
-                else:
-                    bot.delete_message(user_id, msg.message_id)
-                    bot.send_message(user_id, "❌ Download failed")
+                except Exception as e:
+                    print("Admin error:", e)
 
             except Exception as e:
                 print("ERROR:", e)
-
-                try:
-                    bot.delete_message(user_id, msg.message_id)
-                except:
-                    pass
-
                 bot.send_message(user_id, "❌ Error occurred")
 
         thread = threading.Thread(target=run_bot, args=(bot,), daemon=True)
@@ -275,7 +272,6 @@ def start_user_bot(token, platform):
 def start_all_bots():
     try:
         bots = get_all_bots()
-
         print(f"🤖 Loading {len(bots)} bots...")
 
         for b in bots:
