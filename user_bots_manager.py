@@ -1,6 +1,7 @@
 import telebot
 import threading
 import time
+import re
 
 from telebot.types import (
     ReplyKeyboardMarkup,
@@ -14,9 +15,6 @@ from downloader import download_video
 from receiver_bot import send_to_admin
 from checker_bot import is_user_joined, force_join_message
 
-# ==============================
-# RUNNING BOTS
-# ==============================
 running_bots = {}
 
 # ==============================
@@ -26,19 +24,27 @@ def clean_token(token):
     return token.replace(" ", "").strip()
 
 # ==============================
-# EXTRACT URL (🔥 muhiim)
+# 🔥 EXTRACT URL (FINAL FIX)
 # ==============================
 def extract_url(message):
-    if message.text:
-        return message.text.strip()
+    text = ""
 
-    if message.caption:
-        return message.caption.strip()
+    if message.text:
+        text = message.text
+
+    elif message.caption:
+        text = message.caption
+
+    # 🔥 find ALL urls
+    urls = re.findall(r'(https?://[^\s]+)', text)
+
+    if urls:
+        return urls[0]
 
     return None
 
 # ==============================
-# PLATFORM CHECK (🔥 STRONG)
+# PLATFORM CHECK
 # ==============================
 def is_valid_platform(url, platform):
     if not url:
@@ -81,7 +87,7 @@ def is_valid_platform(url, platform):
     return False
 
 # ==============================
-# BOT THREAD (AUTO RESTART)
+# BOT THREAD
 # ==============================
 def run_bot(bot):
     while True:
@@ -110,9 +116,7 @@ def start_user_bot(token, platform):
 
         print(f"🚀 Bot started: {token[:10]} ({platform})")
 
-        # ==============================
         # START
-        # ==============================
         @bot.message_handler(commands=['start'])
         def start(message):
             user_id = message.chat.id
@@ -132,9 +136,7 @@ def start_user_bot(token, platform):
                 reply_markup=kb
             )
 
-        # ==============================
-        # CREATE BOT BUTTON
-        # ==============================
+        # CREATE BUTTON
         @bot.message_handler(func=lambda m: m.text == "🤖 Create your bot")
         def create_bot(message):
             kb = InlineKeyboardMarkup()
@@ -144,17 +146,18 @@ def start_user_bot(token, platform):
                     url="https://t.me/Create_Our_own_bot"
                 )
             )
-
             bot.send_message(message.chat.id, "Click below 👇", reply_markup=kb)
 
         # ==============================
-        # HANDLE MESSAGES 🔥
+        # HANDLE 🔥 FINAL
         # ==============================
         @bot.message_handler(content_types=['text', 'photo', 'video'])
         def handle(message):
             user_id = message.chat.id
 
             url = extract_url(message)
+
+            print("URL:", url)  # DEBUG
 
             if not url:
                 bot.send_message(user_id, "❌ Send valid link")
@@ -166,7 +169,6 @@ def start_user_bot(token, platform):
                 bot.send_message(user_id, force_join_message(user_id))
                 return
 
-            # 🔥 PLATFORM FILTER
             if not is_valid_platform(url, platform):
                 bot.send_message(
                     user_id,
@@ -190,7 +192,7 @@ def start_user_bot(token, platform):
 
                     username = bot.get_me().username
 
-                    # ========= VIDEOS =========
+                    # ===== VIDEO =====
                     if videos:
                         for i, v in enumerate(videos):
                             if i == len(videos) - 1:
@@ -202,7 +204,7 @@ def start_user_bot(token, platform):
                             else:
                                 bot.send_video(user_id, v)
 
-                    # ========= IMAGES =========
+                    # ===== IMAGE =====
                     elif images:
                         for i, img in enumerate(images):
                             if i == len(images) - 1:
@@ -219,7 +221,6 @@ def start_user_bot(token, platform):
 
                     add_download(platform)
 
-                    # ADMIN LOG
                     try:
                         send_to_admin(
                             video_url=videos[0] if videos else images[0],
@@ -228,7 +229,7 @@ def start_user_bot(token, platform):
                             platform=platform
                         )
                     except Exception as e:
-                        print("Receiver error:", e)
+                        print("Admin error:", e)
 
                 else:
                     bot.delete_message(user_id, msg.message_id)
@@ -244,9 +245,6 @@ def start_user_bot(token, platform):
 
                 bot.send_message(user_id, "❌ Error occurred")
 
-        # ==============================
-        # THREAD START
-        # ==============================
         thread = threading.Thread(target=run_bot, args=(bot,), daemon=True)
         thread.start()
 
@@ -254,7 +252,7 @@ def start_user_bot(token, platform):
         print("❌ Start error:", e)
 
 # ==============================
-# START ALL BOTS
+# START ALL
 # ==============================
 def start_all_bots():
     try:
