@@ -125,59 +125,59 @@ def handle_all(message):
         except Exception as e:
             print("TOKEN ERROR:", e)
             bot.send_message(message.chat.id, "❌ Invalid token")
-            
-# ======================
-# PLATFORM STEP
-# ======================
-elif isinstance(step, dict):
-    platform = message.text.lower().strip()
 
-    if platform == "x":
-        platform = "twitter"
+    # ======================
+    # PLATFORM STEP
+    # ======================
+    elif isinstance(step, dict):
+        platform = message.text.lower().strip()
 
-    token = step["token"]
-    username = step["username"]
+        if platform == "x":
+            platform = "twitter"
 
-    if platform not in ["tiktok", "instagram", "twitter"]:
-        bot.send_message(message.chat.id, "❌ Choose valid platform")
-        return
+        token = step["token"]
+        username = step["username"]
 
-    existing = bots.find_one({"token": token})
-    if existing:
-        bot.send_message(message.chat.id, "⚠️ Bot already exists")
-        user_step[message.chat.id] = None
-        main_menu(message.chat.id)
-        return
+        if platform not in ["tiktok", "instagram", "twitter"]:
+            bot.send_message(message.chat.id, "❌ Choose valid platform")
+            return
 
-    # SAVE DB
-    bots.insert_one({
-        "user_id": message.chat.id,
-        "token": token,
-        "platform": platform,
-        "username": username
-    })
+        existing = bots.find_one({"token": token})
+        if existing:
+            bot.send_message(message.chat.id, "⚠️ Bot already exists")
+            user_step[message.chat.id] = None
+            main_menu(message.chat.id)
+            return
 
-    # START BOT
-    def run_bot():
-        try:
-            start_user_bot(token, platform)
-        except Exception as e:
-            print("START BOT ERROR:", e)
+        # SAVE DB
+        bots.insert_one({
+            "user_id": message.chat.id,
+            "token": token,
+            "platform": platform,
+            "username": username
+        })
 
-    threading.Thread(target=run_bot).start()
+        # START BOT
+        def run_bot():
+            try:
+                start_user_bot(token, platform)
+            except Exception as e:
+                print("START BOT ERROR:", e)
 
-    bot.send_message(
-        message.chat.id,
-        f"""✅ Bot Added Successfully
+        threading.Thread(target=run_bot).start()
+
+        bot.send_message(
+            message.chat.id,
+            f"""✅ Bot Added Successfully
 
 🤖 Bot: @{username}
 📱 Platform: {platform}
 
 🚀 Your bot is LIVE!"""
-    )
+        )
 
-    user_step[message.chat.id] = None
-    main_menu(message.chat.id)
+        user_step[message.chat.id] = None
+        main_menu(message.chat.id)
 
     # ======================
     # REMOVE STEP
