@@ -127,9 +127,9 @@ def handle_all(message):
             bot.send_message(message.chat.id, "❌ Invalid token")
 
     # ======================
-    # PLATFORM STEP
-    # ======================
-    elif isinstance(step, dict):
+# PLATFORM STEP
+# ======================
+elif isinstance(step, dict):
     # 🔥 normalize platform
     platform = message.text.lower().strip()
 
