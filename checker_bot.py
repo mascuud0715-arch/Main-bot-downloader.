@@ -18,20 +18,19 @@ CHANNELS = [
 # CHECK USER JOINED
 # ==============================
 def is_user_joined(user_id):
-    for ch in CHANNELS:
-        try:
+    try:
+        for ch in CHANNELS:
             member = bot.get_chat_member(ch, user_id)
 
-            print(f"[CHECK] {user_id} in {ch} => {member.status}")
-
+            # ✅ allowed users
             if member.status not in ["member", "administrator", "creator"]:
                 return False
 
-        except Exception as e:
-            print(f"[ERROR] {ch} =>", e)
-            return False
+        return True
 
-    return True
+    except Exception as e:
+        print("JOIN ERROR:", e)
+        return False
 
 # ==============================
 # FORCE JOIN MESSAGE
