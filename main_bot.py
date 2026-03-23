@@ -196,3 +196,6 @@ def handle_all(message):
         user_step[message.chat.id] = None
         main_menu(message.chat.id)
 
+def start_main_bot():
+    print("🚀 Main bot running...")
+    bot.infinity_polling(skip_pending=True)
