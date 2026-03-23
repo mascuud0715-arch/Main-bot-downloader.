@@ -4,24 +4,19 @@ import uuid
 import requests
 from io import BytesIO
 
-# ==============================
-# CREATE DOWNLOAD FOLDER
-# ==============================
 DOWNLOAD_DIR = "downloads"
 
 if not os.path.exists(DOWNLOAD_DIR):
     os.makedirs(DOWNLOAD_DIR)
 
 # ==============================
-# EXPAND SHORT LINKS
+# EXPAND URL
 # ==============================
 def expand_url(url):
     try:
         if any(x in url for x in ["vt.tiktok.com", "vm.tiktok.com", "t.co"]):
-            r = requests.get(url, allow_redirects=True, timeout=10)
-            url = r.url
+            url = requests.get(url, allow_redirects=True, timeout=10).url
 
-        # FIX X → Twitter
         if "x.com" in url:
             url = url.replace("x.com", "twitter.com")
 
@@ -31,154 +26,148 @@ def expand_url(url):
     return url
 
 # ==============================
-# TIKTOK API FALLBACK (SAFE)
+# PLATFORM CHECK
 # ==============================
-def tiktok_api_download(url):
+def is_valid(url, platform):
+    if platform == "tiktok":
+        return "tiktok.com" in url
+    if platform == "instagram":
+        return "instagram.com" in url
+    if platform == "twitter":
+        return "twitter.com" in url
+    return False
+
+# ==============================
+# TIKTOK API (VIDEO + IMAGES)
+# ==============================
+def tiktok_api(url):
     try:
         api = f"https://tikwm.com/api/?url={url}"
-        r = requests.get(api, timeout=10).json()
+        res = requests.get(api, timeout=10).json()
 
-        if r.get("data"):
-            data = r["data"]
+        videos = []
+        images = []
 
-            videos = []
-            images = []
+        if res.get("data"):
+            d = res["data"]
 
             # VIDEO
-            if data.get("play"):
-                video_data = requests.get(data["play"], timeout=10).content
-                videos.append(BytesIO(video_data))
+            if d.get("play"):
+                videos.append(BytesIO(requests.get(d["play"]).content))
 
-            # IMAGES (slideshow)
-            if data.get("images"):
-                for img_url in data["images"]:
-                    img_data = requests.get(img_url, timeout=10).content
-                    images.append(BytesIO(img_data))
+            # IMAGES (🔥 muhiim)
+            if d.get("images"):
+                for img in d["images"]:
+                    images.append(BytesIO(requests.get(img).content))
 
-            if videos or images:
-                return {
-                    "status": True,
-                    "videos": videos,
-                    "images": images
-                }
+        if videos or images:
+            return {"status": True, "videos": videos, "images": images}
 
         return {"status": False}
 
     except Exception as e:
-        print("TIKTOK API ERROR:", e)
+        print("TT API ERROR:", e)
         return {"status": False}
 
 # ==============================
-# PLATFORM CHECK (VERY STRONG 🔒)
+# INSTAGRAM API (🔥 FIX)
 # ==============================
-def is_valid_platform(url, platform):
-    if platform == "tiktok":
-        return "tiktok.com" in url
-
-    elif platform == "instagram":
-        return "instagram.com" in url
-
-    elif platform == "twitter":
-        return "twitter.com" in url
-
-    return False
-
-# ==============================
-# MAIN DOWNLOAD FUNCTION
-# ==============================
-def download_video(url, platform="unknown"):
+def instagram_api(url):
     try:
-        # ==============================
-        # EXPAND URL
-        # ==============================
+        api = f"https://igram.world/api/ig?url={url}"
+        res = requests.get(api, timeout=10).json()
+
+        videos = []
+        images = []
+
+        if res.get("media"):
+            for m in res["media"]:
+                link = m.get("url")
+                if not link:
+                    continue
+
+                data = requests.get(link).content
+
+                if m.get("type") == "video":
+                    videos.append(BytesIO(data))
+                else:
+                    images.append(BytesIO(data))
+
+        if videos or images:
+            return {"status": True, "videos": videos, "images": images}
+
+        return {"status": False}
+
+    except Exception as e:
+        print("IG API ERROR:", e)
+        return {"status": False}
+
+# ==============================
+# MAIN FUNCTION
+# ==============================
+def download_video(url, platform):
+    try:
         url = expand_url(url)
-        print("FINAL URL:", url)
-        print("PLATFORM:", platform)
+        print("URL:", url, "| PLATFORM:", platform)
 
-        # ==============================
-        # 🔒 HARD PLATFORM LOCK
-        # ==============================
-        if not is_valid_platform(url, platform):
-            print("BLOCKED: WRONG PLATFORM")
+        # 🔒 PLATFORM LOCK
+        if not is_valid(url, platform):
             return {"status": False}
-
-        # ==============================
-        # FILE SETUP
-        # ==============================
-        file_id = str(uuid.uuid4())
-        base_path = os.path.join(DOWNLOAD_DIR, file_id)
 
         videos = []
         images = []
 
         # ==============================
-        # YT-DLP OPTIONS
+        # 1️⃣ TRY YT-DLP
         # ==============================
-        ydl_opts = {
-            "outtmpl": base_path + ".%(ext)s",
-            "format": "best",
-            "noplaylist": True,
-            "quiet": True,
-            "nocheckcertificate": True,
-            "http_headers": {
-                "User-Agent": "Mozilla/5.0"
-            }
-        }
+        file_id = str(uuid.uuid4())
+        base = os.path.join(DOWNLOAD_DIR, file_id)
 
-        # ==============================
-        # TRY YT-DLP
-        # ==============================
         try:
+            ydl_opts = {
+                "outtmpl": base + ".%(ext)s",
+                "format": "best",
+                "quiet": True,
+                "noplaylist": True,
+            }
+
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.extract_info(url, download=True)
+
         except Exception as e:
-            print("YTDLP ERROR:", e)
+            print("YTDLP FAIL:", e)
+
+        # READ FILES
+        for f in os.listdir(DOWNLOAD_DIR):
+            if f.startswith(file_id):
+                p = os.path.join(DOWNLOAD_DIR, f)
+                data = open(p, "rb").read()
+
+                if f.endswith((".mp4", ".webm")):
+                    videos.append(BytesIO(data))
+                elif f.endswith((".jpg", ".png", ".jpeg")):
+                    images.append(BytesIO(data))
 
         # ==============================
-        # COLLECT FILES
+        # 2️⃣ PLATFORM FALLBACKS
         # ==============================
-        for file in os.listdir(DOWNLOAD_DIR):
-            if file.startswith(file_id):
-                full_path = os.path.join(DOWNLOAD_DIR, file)
 
-                try:
-                    with open(full_path, "rb") as f:
-                        data = f.read()
+        # 🔥 TIKTOK FIX
+        if platform == "tiktok" and not videos and not images:
+            return tiktok_api(url)
 
-                    if file.endswith((".mp4", ".mkv", ".webm")):
-                        videos.append(BytesIO(data))
-
-                    elif file.endswith((".jpg", ".jpeg", ".png")):
-                        images.append(BytesIO(data))
-
-                except Exception as e:
-                    print("FILE READ ERROR:", e)
-
-        # ==============================
-        # 🔥 SAFE TIKTOK FALLBACK (LOCKED)
-        # ==============================
-        if (
-            platform == "tiktok"
-            and "tiktok.com" in url
-            and not videos
-            and not images
-        ):
-            print("Using TikTok API fallback...")
-            return tiktok_api_download(url)
+        # 🔥 INSTAGRAM FIX
+        if platform == "instagram" and not videos and not images:
+            return instagram_api(url)
 
         # ==============================
         # RESULT
         # ==============================
         if videos or images:
-            return {
-                "status": True,
-                "videos": videos,
-                "images": images
-            }
+            return {"status": True, "videos": videos, "images": images}
 
-        print("NO MEDIA FOUND")
         return {"status": False}
 
     except Exception as e:
-        print("DOWNLOAD ERROR:", e)
+        print("ERROR:", e)
         return {"status": False}
