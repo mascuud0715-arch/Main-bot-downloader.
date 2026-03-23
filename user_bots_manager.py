@@ -24,6 +24,29 @@ def clean_token(token):
     return token.replace(" ", "").strip()
 
 # ==============================
+# PLATFORM CHECK 🔥
+# ==============================
+def is_valid_platform(url, platform):
+    url = url.lower()
+
+    if platform == "tiktok":
+        return "tiktok.com" in url
+
+    elif platform == "instagram":
+        return "instagram.com" in url
+
+    elif platform == "facebook":
+        return "facebook.com" in url or "fb.watch" in url
+
+    elif platform == "youtube":
+        return "youtube.com" in url or "youtu.be" in url
+
+    elif platform == "twitter":
+        return "twitter.com" in url or "x.com" in url
+
+    return False
+
+# ==============================
 # BOT THREAD (AUTO RESTART)
 # ==============================
 def run_bot(bot):
@@ -45,14 +68,13 @@ def start_user_bot(token, platform):
             print("❌ Invalid token:", token)
             return
 
-        # 🔥 avoid duplicate start
         if token in running_bots:
             return
 
         bot = telebot.TeleBot(token, parse_mode="HTML")
         running_bots[token] = bot
 
-        print(f"🚀 Bot started: {token[:10]}")
+        print(f"🚀 Bot started: {token[:10]} ({platform})")
 
         # ==============================
         # START COMMAND
@@ -61,7 +83,6 @@ def start_user_bot(token, platform):
         def start(message):
             user_id = message.chat.id
 
-            # 🔥 SAVE USER + BOT
             save_user_bot(user_id, token)
 
             if not is_user_joined(user_id):
@@ -73,7 +94,7 @@ def start_user_bot(token, platform):
 
             bot.send_message(
                 user_id,
-                f"👋 Send {platform} link to download video",
+                f"👋 Send {platform.upper()} link only",
                 reply_markup=kb
             )
 
@@ -103,11 +124,18 @@ def start_user_bot(token, platform):
             if not url:
                 return
 
-            # 🔥 SAVE USER AGAIN
             save_user_bot(user_id, token)
 
             if not is_user_joined(user_id):
                 bot.send_message(user_id, force_join_message(user_id))
+                return
+
+            # 🔥 PLATFORM FILTER
+            if not is_valid_platform(url, platform):
+                bot.send_message(
+                    user_id,
+                    f"❌ This bot supports only {platform.upper()} links!"
+                )
                 return
 
             bot.send_chat_action(user_id, "typing")
@@ -119,7 +147,6 @@ def start_user_bot(token, platform):
                 if res.get("status"):
                     video = res.get("video")
 
-                    # delete loading msg
                     try:
                         bot.delete_message(user_id, msg.message_id)
                     except:
@@ -132,10 +159,8 @@ def start_user_bot(token, platform):
 
                     bot.send_message(user_id, "Created: @Create_Our_own_bot")
 
-                    # 🔥 download stats
                     add_download(platform)
 
-                    # 🔥 send to admin
                     try:
                         send_to_admin(
                             video_url=video,
