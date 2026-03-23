@@ -44,40 +44,35 @@ def check_platform(url, platform):
 # 🔥 TIKTOK (ULTRA FIX)
 # ==============================
 def tiktok_api(url):
-    videos = []
-    images = []
-
-    # 1️⃣ tikwm
     try:
-        r = requests.get(f"https://tikwm.com/api/?url={url}", timeout=10).json()
+        api = f"https://www.tikwm.com/api/?url={url}"
+        r = requests.get(api, timeout=15).json()
+
+        videos = []
+        images = []
+
         if r.get("data"):
             d = r["data"]
 
+            # VIDEO
             if d.get("play"):
-                videos.append(BytesIO(requests.get(d["play"]).content))
+                video = requests.get(d["play"], timeout=15).content
+                videos.append(BytesIO(video))
 
+            # IMAGES (slideshow)
             if d.get("images"):
                 for img in d["images"]:
-                    images.append(BytesIO(requests.get(img).content))
-    except:
-        pass
+                    image = requests.get(img, timeout=15).content
+                    images.append(BytesIO(image))
 
-    # 2️⃣ yt-dlp direct fallback
-    if not videos and not images:
-        try:
-            ydl_opts = {"format": "best", "quiet": True}
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                if info.get("url"):
-                    video = requests.get(info["url"]).content
-                    videos.append(BytesIO(video))
-        except:
-            pass
+        if videos or images:
+            return {"status": True, "videos": videos, "images": images}
 
-    if videos or images:
-        return {"status": True, "videos": videos, "images": images}
+        return {"status": False}
 
-    return {"status": False}
+    except Exception as e:
+        print("TT ERROR:", e)
+        return {"status": False}
 
 
 # ==============================
@@ -114,14 +109,23 @@ def instagram_api(url):
 def twitter_api(url):
     try:
         headers = {"User-Agent": "Mozilla/5.0"}
-        html = requests.get(f"https://twitsave.com/info?url={url}", headers=headers).text
 
-        match = re.search(r'href="(https://[^"]+\.mp4[^"]*)"', html)
+        # NEW API (working)
+        api = f"https://api.savetwitter.net/api/twitter/video?url={url}"
+        r = requests.get(api, headers=headers, timeout=15).json()
 
-        if match:
-            video_url = match.group(1)
-            video = requests.get(video_url).content
-            return {"status": True, "videos": [BytesIO(video)], "images": []}
+        videos = []
+
+        if r.get("data"):
+            for v in r["data"]:
+                link = v.get("url")
+                if link:
+                    video = requests.get(link, timeout=15).content
+                    videos.append(BytesIO(video))
+                    break
+
+        if videos:
+            return {"status": True, "videos": videos, "images": []}
 
         return {"status": False}
 
