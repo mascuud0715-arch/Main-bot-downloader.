@@ -85,16 +85,30 @@ def is_valid_platform(url, platform):
         ])
 
     elif platform == "instagram":
-        return "instagram.com" in url
+        return any(x in url for x in [
+            "instagram.com",
+            "instagr.am"
+        ])
 
     elif platform == "facebook":
-        return any(x in url for x in ["facebook.com", "fb.watch"])
+        return any(x in url for x in [
+            "facebook.com",
+            "fb.watch",
+            "fb.com"
+        ])
 
     elif platform == "youtube":
-        return any(x in url for x in ["youtube.com", "youtu.be"])
+        return any(x in url for x in [
+            "youtube.com",
+            "youtu.be"
+        ])
 
     elif platform == "twitter":
-        return any(x in url for x in ["twitter.com", "x.com"])
+        return any(x in url for x in [
+            "twitter.com",
+            "mobile.twitter.com",
+            "x.com"
+        ])
 
     return False
 
