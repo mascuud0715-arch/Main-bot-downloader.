@@ -10,23 +10,62 @@ if not os.path.exists("downloads"):
     os.makedirs("downloads")
 
 # ==============================
-# EXPAND SHORT LINKS (TikTok/X)
+# EXPAND SHORT LINKS
 # ==============================
 def expand_url(url):
     try:
-        if "vt.tiktok.com" in url or "vm.tiktok.com" in url or "t.co" in url:
+        if any(x in url for x in ["vt.tiktok.com", "vm.tiktok.com", "t.co"]):
             r = requests.get(url, allow_redirects=True, timeout=10)
             return r.url
-    except:
-        pass
+    except Exception as e:
+        print("EXPAND ERROR:", e)
     return url
+
+# ==============================
+# TIKTOK API FALLBACK (🔥 muhiim)
+# ==============================
+def tiktok_api_download(url):
+    try:
+        api = f"https://tikwm.com/api/?url={url}"
+        r = requests.get(api, timeout=10).json()
+
+        if r.get("data"):
+            data = r["data"]
+
+            video_url = data.get("play")
+            images = data.get("images")
+
+            videos = []
+            imgs = []
+
+            # video
+            if video_url:
+                videos.append(video_url)
+
+            # images (slideshow)
+            if images:
+                for img in images:
+                    imgs.append(img)
+
+            if videos or imgs:
+                return {
+                    "status": True,
+                    "videos": videos,
+                    "images": imgs
+                }
+
+        return {"status": False}
+
+    except Exception as e:
+        print("TIKTOK API ERROR:", e)
+        return {"status": False}
 
 # ==============================
 # MAIN DOWNLOAD FUNCTION
 # ==============================
 def download_video(url, platform="unknown"):
     try:
-        # 🔥 expand short links
+        # expand links
         url = expand_url(url)
         print("FINAL URL:", url)
 
@@ -47,11 +86,16 @@ def download_video(url, platform="unknown"):
             "nocheckcertificate": True,
         }
 
+        info = None
+
         # ==============================
-        # DOWNLOAD
+        # TRY YT-DLP
         # ==============================
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+        except Exception as e:
+            print("YTDLP ERROR:", e)
 
         # ==============================
         # COLLECT FILES
@@ -65,6 +109,13 @@ def download_video(url, platform="unknown"):
 
                 elif file.endswith((".jpg", ".jpeg", ".png")):
                     images.append(open(full_path, "rb"))
+
+        # ==============================
+        # IF YT-DLP FAILED → TIKTOK API
+        # ==============================
+        if not videos and not images and "tiktok.com" in url:
+            print("Using TikTok API fallback...")
+            return tiktok_api_download(url)
 
         # ==============================
         # RESULT
