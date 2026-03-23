@@ -28,15 +28,19 @@ def clean_token(token):
 # 🔥 EXTRACT URL (FINAL FIX)
 # ==============================
 def extract_url(message):
-    text = ""
-
+    # 1. TEXT
     if message.text:
-        text += message.text + " "
+        urls = re.findall(r'(https?://[^\s]+)', message.text)
+        if urls:
+            return urls[0]
 
+    # 2. CAPTION (🔥 muhiim u ah forward)
     if message.caption:
-        text += message.caption + " "
+        urls = re.findall(r'(https?://[^\s]+)', message.caption)
+        if urls:
+            return urls[0]
 
-    # ENTITY (forward fix)
+    # 3. ENTITY (backup)
     if message.entities:
         for e in message.entities:
             if e.type == "url":
@@ -46,12 +50,6 @@ def extract_url(message):
         for e in message.caption_entities:
             if e.type == "url":
                 return message.caption[e.offset:e.offset + e.length]
-
-    # REGEX
-    urls = re.findall(r'(https?://[^\s]+)', text)
-
-    if urls:
-        return urls[0]  # ❌ HA EXPANDIN (fix muhiim)
 
     return None
 
