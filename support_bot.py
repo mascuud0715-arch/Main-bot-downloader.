@@ -184,7 +184,7 @@ Language: {user_lang[uid]}
 
         reply = res.choices[0].message.content
 
-        reply += "\n\n— Created: scholes1"
+        reply += "\n\n— SUPPORT TEAM"
 
         bot.send_message(uid, reply)
 
