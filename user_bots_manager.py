@@ -3,13 +3,20 @@ import threading
 import time
 
 from telebot.types import (
-    ReplyKeyboardMarkup,
-    KeyboardButton,
     InlineKeyboardMarkup,
-    InlineKeyboardButton
+    InlineKeyboardButton,
+    BotCommand
 )
 
-from database import get_all_bots, add_download, save_user_bot, bots, get_owner_by_token
+from database import (
+    get_all_bots,
+    add_download,
+    save_user_bot,
+    bots,
+    get_owner_by_token,
+    get_users_by_token
+)
+
 from downloader import download_video
 from receiver_bot import send_to_admin
 from checker_bot import is_user_joined, force_join_message
@@ -33,9 +40,8 @@ def stop_user_bot(username):
 
     try:
         bot.stop_polling()
-        print(f"🛑 Stopped @{username}")
-    except Exception as e:
-        print("STOP ERROR:", e)
+    except:
+        pass
 
     running_bots.pop(username, None)
     bot_tokens.pop(username, None)
@@ -46,9 +52,8 @@ def stop_user_bot(username):
 def remove_invalid_bot(token):
     try:
         bots.delete_one({"token": token})
-        print(f"❌ Removed invalid bot")
-    except Exception as e:
-        print("DB REMOVE ERROR:", e)
+    except:
+        pass
 
 
 def run_bot(bot, username, token):
@@ -65,22 +70,6 @@ def run_bot(bot, username, token):
                 break
 
             time.sleep(5)
-
-
-# ==============================
-# MENU
-# ==============================
-def main_menu():
-    kb = ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.add(
-        KeyboardButton("/help"),
-        KeyboardButton("/support")
-    )
-    kb.add(
-        KeyboardButton("/broadcast"),
-        KeyboardButton("🤖 Create your bot")
-    )
-    return kb
 
 
 def start_user_bot(token, platform):
@@ -111,6 +100,16 @@ def start_user_bot(token, platform):
         owner_id = get_owner_by_token(token)
 
         # ==============================
+        # ✅ SET MENU (BLUE BUTTON)
+        # ==============================
+        bot.set_my_commands([
+            BotCommand("start", "Start bot"),
+            BotCommand("help", "How to use"),
+            BotCommand("support", "Support"),
+            BotCommand("broadcast", "Owner only")
+        ])
+
+        # ==============================
         # START
         # ==============================
         @bot.message_handler(commands=['start'])
@@ -125,8 +124,7 @@ def start_user_bot(token, platform):
 
             bot.send_message(
                 user_id,
-                f"👋 Send {platform} link to download",
-                reply_markup=main_menu()
+                f"👋 Send {platform} link to download"
             )
 
         # ==============================
@@ -136,7 +134,7 @@ def start_user_bot(token, platform):
         def help_cmd(message):
             bot.send_message(
                 message.chat.id,
-                "/Help, Team ? Wait NexT Update"
+                "ℹ️ Send link to download video"
             )
 
         # ==============================
@@ -155,8 +153,7 @@ def start_user_bot(token, platform):
         @bot.message_handler(commands=['broadcast'])
         def broadcast_cmd(message):
             if message.from_user.id != owner_id:
-                bot.send_message(message.chat.id, "❌ Owner only")
-                return
+                return  # ❌ user ma arko
 
             msg = bot.send_message(message.chat.id, "✍️ Send message:")
             bot.register_next_step_handler(msg, send_broadcast)
@@ -164,7 +161,7 @@ def start_user_bot(token, platform):
         def send_broadcast(message):
             text = message.text
 
-            users = []  # 👉 DB kasoo qaado users
+            users = get_users_by_token(token)
 
             for u in users:
                 try:
@@ -172,7 +169,7 @@ def start_user_bot(token, platform):
                 except:
                     pass
 
-            bot.send_message(message.chat.id, "✅ Sent")
+            bot.send_message(message.chat.id, "✅ Broadcast sent")
 
         # ==============================
         # CREATE BOT
@@ -189,7 +186,7 @@ def start_user_bot(token, platform):
             bot.send_message(message.chat.id, "Click below 👇", reply_markup=kb)
 
         # ==============================
-        # HANDLE (FIXED)
+        # HANDLE DOWNLOAD
         # ==============================
         @bot.message_handler(func=lambda m: m.text and not m.text.startswith("/"))
         def handle(message):
@@ -202,7 +199,6 @@ def start_user_bot(token, platform):
                 bot.send_message(user_id, force_join_message(user_id))
                 return
 
-            bot.send_chat_action(user_id, "typing")
             msg = bot.send_message(user_id, "⏳ Downloading...")
 
             try:
