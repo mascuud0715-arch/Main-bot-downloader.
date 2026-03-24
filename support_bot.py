@@ -1,25 +1,20 @@
-import telebot
 import os
+import telebot
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # ==============================
-# ENV TOKEN (RAILWAY)
+# ENV VARIABLES
 # ==============================
-TOKEN = os.getenv("SUPPORT_BOT_TOKEN")
+SUPPORT_BOT_TOKEN = os.getenv("SUPPORT_BOT_TOKEN")
+ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
-bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
+if not SUPPORT_BOT_TOKEN:
+    raise Exception("❌ SUPPORT_BOT_TOKEN not set")
 
-# ==============================
-# START MENU
-# ==============================
-def support_menu():
-    from telebot.types import ReplyKeyboardMarkup, KeyboardButton
+if not ADMIN_ID:
+    raise Exception("❌ ADMIN_ID not set")
 
-    kb = ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.add(
-        KeyboardButton("🎥 Video Download Error"),
-        KeyboardButton("🤖 Bot No Talk")
-    )
-    return kb
+bot = telebot.TeleBot(SUPPORT_BOT_TOKEN, parse_mode="HTML")
 
 
 # ==============================
@@ -27,58 +22,115 @@ def support_menu():
 # ==============================
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.send_message(
-        message.chat.id,
-        "🛠 Welcome to Support Bot\n\nChoose problem 👇",
-        reply_markup=support_menu()
+    kb = InlineKeyboardMarkup()
+    kb.add(
+        InlineKeyboardButton("📥 Video Error", callback_data="video"),
+        InlineKeyboardButton("⚠️ Download Error", callback_data="download")
     )
-
-
-# ==============================
-# ERROR TYPES
-# ==============================
-@bot.message_handler(func=lambda m: m.text == "🎥 Video Download Error")
-def video_error(message):
-    msg = bot.send_message(
-        message.chat.id,
-        "📥 Send your bot username (@yourbot):"
+    kb.add(
+        InlineKeyboardButton("📢 Broadcast Error", callback_data="broadcast"),
+        InlineKeyboardButton("⚙️ System Error", callback_data="system")
     )
-    bot.register_next_step_handler(msg, fix_bot)
-
-
-@bot.message_handler(func=lambda m: m.text == "🤖 Bot No Talk")
-def bot_dead(message):
-    msg = bot.send_message(
-        message.chat.id,
-        "📥 Send your bot username (@yourbot):"
-    )
-    bot.register_next_step_handler(msg, fix_bot)
-
-
-# ==============================
-# FIX BOT (SIMPLE VERSION)
-# ==============================
-def fix_bot(message):
-    username = message.text.replace("@", "").lower()
 
     bot.send_message(
         message.chat.id,
-        f"✅ Bot @{username} received!\n\n⏳ We will fix it soon."
+        "🤖 Welcome to Support Bot\nChoose your problem 👇",
+        reply_markup=kb
     )
 
-    # 👉 Halkan waxaad ku dari kartaa:
-    # - send_to_admin()
-    # - restart bot
-    # - check status
+
+# ==============================
+# BUTTON HANDLER
+# ==============================
+@bot.callback_query_handler(func=lambda call: True)
+def callback(call):
+    data = call.data
+    bot.answer_callback_query(call.id)
+
+    if data == "video":
+        bot.send_message(call.message.chat.id, "📹 Send video / link")
+        bot.register_next_step_handler(call.message, forward_to_admin, "VIDEO")
+
+    elif data == "download":
+        bot.send_message(call.message.chat.id, "⚠️ Send download problem")
+        bot.register_next_step_handler(call.message, auto_fix_download)
+
+    elif data == "broadcast":
+        bot.send_message(call.message.chat.id, "📢 Send broadcast issue")
+        bot.register_next_step_handler(call.message, auto_fix_broadcast)
+
+    elif data == "system":
+        bot.send_message(call.message.chat.id, "⚙️ Send system error")
+        bot.register_next_step_handler(call.message, auto_fix_system)
+
+
+# ==============================
+# AUTO FIX
+# ==============================
+def auto_fix_download(message):
+    text = (message.text or "").lower()
+
+    if "tiktok" in text:
+        bot.send_message(message.chat.id, "✅ Fix: TikTok link must be public")
+
+    elif "x" in text or "twitter" in text:
+        bot.send_message(message.chat.id, "✅ Fix: Use correct X link")
+
+    else:
+        forward_to_admin(message, "DOWNLOAD")
+
+
+def auto_fix_broadcast(message):
+    bot.send_message(
+        message.chat.id,
+        "✅ Fix:\n- Users exist\n- Token sax yahay\n- Restart bot"
+    )
+
+
+def auto_fix_system(message):
+    bot.send_message(
+        message.chat.id,
+        "✅ Railway Fix:\n1. Restart service\n2. Check logs\n3. Check MONGO_URI"
+    )
+
+
+# ==============================
+# FORWARD TO ADMIN
+# ==============================
+def forward_to_admin(message, problem_type):
+    try:
+        user = message.from_user
+
+        text = f"""
+🚨 NEW SUPPORT REQUEST
+
+👤 User: @{user.username}
+🆔 ID: {user.id}
+📌 Type: {problem_type}
+
+💬 Message:
+{message.text}
+"""
+
+        bot.send_message(ADMIN_ID, text)
+
+        # haddii video / photo jiro
+        if message.video:
+            bot.send_video(ADMIN_ID, message.video.file_id)
+
+        if message.photo:
+            bot.send_photo(ADMIN_ID, message.photo[-1].file_id)
+
+        bot.send_message(message.chat.id, "✅ Sent to admin")
+
+    except Exception as e:
+        print("Forward error:", e)
+        bot.send_message(message.chat.id, "❌ Failed to send")
 
 
 # ==============================
 # RUN
 # ==============================
 def run():
-    print("🛠 Support Bot Running...")
+    print("🤖 Support bot running...")
     bot.infinity_polling(skip_pending=True)
-
-
-if __name__ == "__main__":
-    run()
