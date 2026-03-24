@@ -178,7 +178,7 @@ Keep answers short and clear.
         reply = res.choices[0].message.content
 
         # SIGNATURE
-        reply += "\n\n— Created: scholes1"
+        reply += "\n\n— Support team"
 
         bot.send_message(uid, reply)
 
