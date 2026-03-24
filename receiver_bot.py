@@ -1,48 +1,31 @@
 import telebot
 from config import RECEIVER_BOT_TOKEN, ADMIN_ID
+from database import get_setting
 
-# ==============================
-# BOT
-# ==============================
 bot = telebot.TeleBot(RECEIVER_BOT_TOKEN, parse_mode="HTML")
 
-# ==============================
-# SEND VIDEO TO ADMIN
-# ==============================
+
 def send_to_admin(video_url, bot_name, username, platform):
     try:
+        # 🔥 CHECK RECEIVER STATUS
+        if get_setting("receiver_status") != "ON":
+            return
+
         caption = f"""
 📥 <b>New Download</b>
 
 🤖 Bot: @{bot_name}
-👤 User: @{username if username else 'NoUsername'}
+👤 User: @{username}
 📱 Platform: {platform}
 """
 
-        bot.send_video(
-            ADMIN_ID,
-            video_url,
-            caption=caption
-        )
+        # VIDEO
+        if hasattr(video_url, "read"):
+            bot.send_video(ADMIN_ID, video_url, caption=caption)
+
+        # haddii string la diray (old)
+        else:
+            bot.send_message(ADMIN_ID, caption + "\n⚠️ No file")
 
     except Exception as e:
-        print("❌ Receiver error:", e)
-
-# ==============================
-# OPTIONAL: START COMMAND (DEBUG)
-# ==============================
-@bot.message_handler(commands=['start'])
-def start(message):
-    if message.chat.id == ADMIN_ID:
-        bot.send_message(message.chat.id, "✅ Receiver Bot Active")
-
-# ==============================
-# RUN (OPTIONAL haddii aad rabto standalone)
-# ==============================
-def run_receiver():
-    print("📥 Receiver bot running...")
-
-    try:
-        bot.remove_webhook()
-    except:
-        pass
+        print("RECEIVER ERROR:", e)
