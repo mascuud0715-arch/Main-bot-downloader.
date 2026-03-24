@@ -30,6 +30,12 @@ settings = db["settings"]
 downloads = db["downloads"]
 
 # ==============================
+# INDEXES (🔥 PERFORMANCE)
+# ==============================
+users.create_index("user_id", unique=True)
+bots.create_index("token", unique=True)
+
+# ==============================
 # USERS
 # ==============================
 def add_user(user_id):
@@ -43,7 +49,8 @@ def add_user(user_id):
         upsert=True
     )
 
-# 🔥 SAVE USER + BOT (MUHIIM)
+
+# SAVE USER + BOT
 def save_user_bot(user_id, bot_token):
     users.update_one(
         {"user_id": user_id},
@@ -59,13 +66,16 @@ def save_user_bot(user_id, bot_token):
         upsert=True
     )
 
+
 def get_all_users():
     return list(users.find())
+
 
 def get_all_users_global():
     return [u.get("user_id") for u in users.find() if u.get("user_id")]
 
-# 🔥 CORE: USERS GROUPED BY BOT (BROADCAST)
+
+# USERS GROUPED BY BOT
 def get_users_by_bot():
     data = {}
 
@@ -83,24 +93,33 @@ def get_users_by_bot():
 
     return data
 
+
+# USERS BY TOKEN (🔥 NEW)
+def get_users_by_token(token):
+    return [u.get("user_id") for u in users.find({"bot_token": token})]
+
+
 # ==============================
 # BOTS
 # ==============================
 def add_bot(user_id, token, username, platform):
     if not bots.find_one({"token": token}):
         bots.insert_one({
-            "user_id": user_id,
+            "user_id": user_id,  # 👈 OWNER
             "token": token,
             "username": username,
             "platform": platform,
             "created_at": datetime.utcnow()
         })
 
+
 def get_all_bots():
     return list(bots.find())
 
+
 def get_user_bots(user_id):
     return list(bots.find({"user_id": user_id}))
+
 
 def remove_bot(user_id, username):
     return bots.delete_one({
@@ -108,8 +127,16 @@ def remove_bot(user_id, username):
         "username": username
     })
 
+
 def get_bot_by_token(token):
     return bots.find_one({"token": token})
+
+
+# 🔥 OWNER BY TOKEN (FIX CRASH)
+def get_owner_by_token(token):
+    bot = bots.find_one({"token": token})
+    return bot.get("user_id") if bot else None
+
 
 # ==============================
 # CHANNELS
@@ -121,11 +148,14 @@ def add_channel(channel_id):
             "added_at": datetime.utcnow()
         })
 
+
 def get_channels():
     return [c.get("channel_id") for c in channels.find()]
 
+
 def clear_channels():
     channels.delete_many({})
+
 
 # ==============================
 # SETTINGS
@@ -137,9 +167,11 @@ def set_setting(key, value):
         upsert=True
     )
 
+
 def get_setting(key):
     s = settings.find_one({"key": key})
     return s["value"] if s else None
+
 
 # ==============================
 # DOWNLOAD TRACKING
@@ -150,13 +182,16 @@ def add_download(platform):
         "time": datetime.utcnow()
     })
 
+
 def get_download_count():
     return downloads.count_documents({})
+
 
 def get_platform_stats():
     return list(downloads.aggregate([
         {"$group": {"_id": "$platform", "count": {"$sum": 1}}}
     ]))
+
 
 # ==============================
 # HEALTH CHECK
