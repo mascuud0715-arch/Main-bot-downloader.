@@ -241,6 +241,20 @@ def handle(message):
         bot.send_message(user_id, "❌ Error occurred")
 
         # ==============================
+        # THREAD START (🔥 FIXED)
+        # ==============================
+        thread = threading.Thread(
+            target=run_bot,
+            args=(bot, username, token),
+            daemon=True
+        )
+        thread.start()
+
+    except Exception as e:
+        print("❌ Start error:", e)
+
+
+        # ==============================
         # THREAD START
         # ==============================
         thread = threading.Thread(
