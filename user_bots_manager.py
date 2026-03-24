@@ -170,7 +170,7 @@ def start_user_bot(token, platform):
             bot.send_chat_action(user_id, "typing")
             msg = bot.send_message(user_id, "⏳ Downloading...")
 
-            try:
+try:
     res = download_video(url, platform)
 
     if res.get("status"):
