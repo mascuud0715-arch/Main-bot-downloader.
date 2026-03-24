@@ -176,7 +176,7 @@ IMPORTANT RULES:
         reply = ask_ai(messages)
 
         # ADD SIGNATURE 🔥
-        reply = reply + "\n\n— Created: scholes1"
+        reply = reply + "\n\n— Created: @scholes1"
 
         bot.send_message(uid, reply)
 
