@@ -8,6 +8,7 @@ import traceback
 import main_bot
 import admin_bot
 import receiver_bot
+import support_bot
 
 # USER BOT SYSTEM
 from user_bots_manager import (
@@ -63,6 +64,14 @@ def run_receiver():
         lambda: receiver_bot.bot.infinity_polling(skip_pending=True)
     )
 
+# ==============================
+# SUPPORT
+# ==============================
+def run_support():
+    safe_run(
+        "SUPPORT BOT",
+        support_bot.run
+    )
 
 # ==============================
 # 🔥 STOP REMOVED BOTS
@@ -136,8 +145,9 @@ if __name__ == "__main__":
     t2 = threading.Thread(target=run_admin, daemon=True)
     t3 = threading.Thread(target=run_receiver, daemon=True)
     t4 = threading.Thread(target=run_user_bots, daemon=True)
+    t5 = threading.Thread(target=run_support, daemon=True)
 
-    threads.extend([t1, t2, t3, t4])
+    threads.extend([t1, t2, t3, t4, t5])
 
     for t in threads:
         t.start()
