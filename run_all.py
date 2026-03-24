@@ -70,7 +70,6 @@ def run_receiver():
 def run_support():
     safe_run(
         "SUPPORT BOT",
-        support_bot.run
         lambda: support_bot.bot.infinity_polling(skip_pending=True)
     )
 
