@@ -1,6 +1,6 @@
 import os
 import telebot
-from telebot.types import ReplyKeyboardMarkup, KeyboardButton
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from openai import OpenAI
 
 from database import (
@@ -49,7 +49,7 @@ def has_bot(user_id):
 
 
 # ==============================
-# START
+# START (INLINE UI)
 # ==============================
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -62,22 +62,46 @@ def start(message):
         )
         return
 
-    kb = ReplyKeyboardMarkup(resize_keyboard=True)
-    for l in LANGS:
-        kb.add(KeyboardButton(l))
+    kb = InlineKeyboardMarkup(row_width=2)
 
-    bot.send_message(user_id, "🌍 Choose your language:", reply_markup=kb)
+    for name in LANGS:
+        kb.add(InlineKeyboardButton(name, callback_data=name))
+
+    bot.send_message(
+        user_id,
+        """🌍 <b>Welcome to AI Support Bot</b>
+
+🤖 Waxaan kaa caawinayaa:
+• Download errors
+• Bot problems
+• Token issues
+• System bugs
+
+👇 Dooro luuqadaada:""",
+        reply_markup=kb
+    )
 
 
 # ==============================
-# LANGUAGE
+# LANGUAGE SELECT
 # ==============================
-@bot.message_handler(func=lambda m: m.text in LANGS)
-def set_lang(message):
-    user_id = message.chat.id
-    user_lang[user_id] = LANGS[message.text]
+@bot.callback_query_handler(func=lambda call: call.data in LANGS)
+def set_language(call):
+    user_id = call.message.chat.id
+    lang = LANGS[call.data]
 
-    bot.send_message(user_id, "✅ Language set\n💬 Ask anything...")
+    user_lang[user_id] = lang
+
+    if lang == "Somali":
+        text = "✅ Luqada waa la dejiyay 🇸🇴\n💬 Wax i waydii!"
+    elif lang == "English":
+        text = "✅ Language set 🇬🇧\n💬 Ask anything!"
+    elif lang == "Arabic":
+        text = "✅ تم اختيار اللغة 🇸🇦\n💬 اسألني!"
+    else:
+        text = f"✅ Language set: {lang}\n💬 Ask anything!"
+
+    bot.edit_message_text(text, call.message.chat.id, call.message.message_id)
 
 
 # ==============================
@@ -89,7 +113,7 @@ def stats(message):
         return
 
     total = get_total_downloads()
-    bot.send_message(message.chat.id, f"📊 Downloads: {total}")
+    bot.send_message(message.chat.id, f"📊 Total Downloads:\n{total}")
 
 
 # ==============================
@@ -105,29 +129,55 @@ def history(message):
         bot.send_message(user_id, "📭 No history")
         return
 
-    text = "🧠 HISTORY:\n\n"
+    txt = "🧠 History:\n\n"
 
     for h in data:
         role = "👤" if h["role"] == "user" else "🤖"
-        text += f"{role}: {h['text']}\n\n"
+        txt += f"{role}: {h['text']}\n\n"
 
-    bot.send_message(user_id, text)
+    bot.send_message(user_id, txt)
 
 
 # ==============================
-# AI SUPPORT
+# AI TEXT
 # ==============================
-@bot.message_handler(func=lambda m: True)
-def ai_support(message):
+@bot.message_handler(content_types=['text'])
+def ai_text(message):
+    handle_ai(message, message.text)
+
+
+# ==============================
+# VOICE AUTO REPLY
+# ==============================
+@bot.message_handler(content_types=['voice'])
+def voice_handler(message):
+    bot.send_message(message.chat.id, "🎤 Voice received... processing")
+
+    handle_ai(message, "User sent voice message")
+
+
+# ==============================
+# PHOTO AUTO REPLY
+# ==============================
+@bot.message_handler(content_types=['photo'])
+def photo_handler(message):
+    bot.send_message(message.chat.id, "🖼 Photo received... processing")
+
+    handle_ai(message, "User sent a photo")
+
+
+# ==============================
+# AI CORE
+# ==============================
+def handle_ai(message, text):
     user_id = message.chat.id
-    text = message.text
 
     if not has_bot(user_id):
         bot.send_message(user_id, "❌ Create bot first:\n@Create_Our_own_bot")
         return
 
     if user_id not in user_lang:
-        bot.send_message(user_id, "⚠️ Choose language first")
+        bot.send_message(user_id, "⚠️ Choose language first (/start)")
         return
 
     lang = user_lang[user_id]
@@ -135,13 +185,13 @@ def ai_support(message):
     try:
         bot.send_chat_action(user_id, "typing")
 
-        # 🔥 GET MEMORY
+        # 🔥 MEMORY
         history = get_user_history(user_id, 10)
 
         messages_list = [
             {
                 "role": "system",
-                "content": f"You are a Telegram bot support expert. Speak {lang}. Fix errors fast."
+                "content": f"You are a Telegram bot support expert. Speak {lang}. Help fix issues."
             }
         ]
 
@@ -169,23 +219,22 @@ def ai_support(message):
 
         bot.send_message(user_id, reply)
 
-        # 🔥 SAVE MEMORY
+        # SAVE MEMORY
         save_message(user_id, "user", text)
         save_message(user_id, "assistant", reply)
 
-        # 🔥 ADMIN FALLBACK
+        # ADMIN FALLBACK
         if "CONTACT ADMIN" in reply.upper():
             forward_admin(message)
 
     except Exception as e:
         print("AI ERROR:", e)
-
         bot.send_message(user_id, "❌ Error → sent to admin")
         forward_admin(message)
 
 
 # ==============================
-# ADMIN
+# ADMIN FORWARD
 # ==============================
 def forward_admin(message):
     try:
@@ -193,7 +242,12 @@ def forward_admin(message):
 
         bot.send_message(
             ADMIN_ID,
-            f"🚨 ISSUE\n@{user.username}\nID: {user.id}\n\n{message.text}"
+            f"""🚨 SUPPORT ISSUE
+
+👤 @{user.username}
+🆔 {user.id}
+
+💬 {message.text}"""
         )
     except:
         pass
@@ -203,5 +257,5 @@ def forward_admin(message):
 # RUN
 # ==============================
 def run():
-    print("🤖 SUPPORT AI RUNNING...")
+    print("🤖 SUPPORT BOT RUNNING...")
     bot.infinity_polling(skip_pending=True)
