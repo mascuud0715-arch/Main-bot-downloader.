@@ -191,7 +191,7 @@ def handle_all(message):
         })
 
         if result.deleted_count:
-            bot.send_message(message.chat.id, f"✅ @{username} removed wait 10 sec and your bot wil stop")
+            bot.send_message(message.chat.id, f"✅ @{username} removed")
         else:
             bot.send_message(message.chat.id, "❌ Bot not found")
 
