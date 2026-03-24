@@ -1,20 +1,32 @@
 import os
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from openai import OpenAI
+
+from database import get_user_bots
 
 # ==============================
-# ENV VARIABLES
+# ENV
 # ==============================
-SUPPORT_BOT_TOKEN = os.getenv("SUPPORT_BOT_TOKEN")
+BOT_TOKEN = os.getenv("SUPPORT_BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
+OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 
-if not SUPPORT_BOT_TOKEN:
-    raise Exception("❌ SUPPORT_BOT_TOKEN not set")
+if not BOT_TOKEN:
+    raise Exception("❌ SUPPORT_BOT_TOKEN missing")
 
-if not ADMIN_ID:
-    raise Exception("❌ ADMIN_ID not set")
+if not OPENAI_KEY:
+    raise Exception("❌ OPENAI_API_KEY missing")
 
-bot = telebot.TeleBot(SUPPORT_BOT_TOKEN, parse_mode="HTML")
+client = OpenAI(api_key=OPENAI_KEY)
+bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
+
+
+# ==============================
+# CHECK USER
+# ==============================
+def has_bot(user_id):
+    return len(get_user_bots(user_id)) > 0
 
 
 # ==============================
@@ -22,115 +34,115 @@ bot = telebot.TeleBot(SUPPORT_BOT_TOKEN, parse_mode="HTML")
 # ==============================
 @bot.message_handler(commands=['start'])
 def start(message):
-    kb = InlineKeyboardMarkup()
-    kb.add(
-        InlineKeyboardButton("📥 Video Error", callback_data="video"),
-        InlineKeyboardButton("⚠️ Download Error", callback_data="download")
-    )
-    kb.add(
-        InlineKeyboardButton("📢 Broadcast Error", callback_data="broadcast"),
-        InlineKeyboardButton("⚙️ System Error", callback_data="system")
-    )
+    user_id = message.chat.id
+
+    if not has_bot(user_id):
+        kb = InlineKeyboardMarkup()
+        kb.add(
+            InlineKeyboardButton(
+                "🤖 Create Bot",
+                url="https://t.me/Create_Our_own_bot"
+            )
+        )
+
+        bot.send_message(
+            user_id,
+            "❌ Go to @Create_Our_own_bot to connect a new Bot and start Bot System.",
+            reply_markup=kb
+        )
+        return
 
     bot.send_message(
-        message.chat.id,
-        "🤖 Welcome to Support Bot\nChoose your problem 👇",
-        reply_markup=kb
+        user_id,
+        "🤖 AI Support is ready\nAsk anything about your bot system 💬"
     )
 
 
 # ==============================
-# BUTTON HANDLER
+# AI RESPONSE
 # ==============================
-@bot.callback_query_handler(func=lambda call: True)
-def callback(call):
-    data = call.data
-    bot.answer_callback_query(call.id)
+@bot.message_handler(func=lambda m: True)
+def ai_support(message):
+    user_id = message.chat.id
+    text = message.text
 
-    if data == "video":
-        bot.send_message(call.message.chat.id, "📹 Send video / link")
-        bot.register_next_step_handler(call.message, forward_to_admin, "VIDEO")
+    if not has_bot(user_id):
+        bot.send_message(
+            user_id,
+            "❌ You must create a bot first:\n@Create_Our_own_bot"
+        )
+        return
 
-    elif data == "download":
-        bot.send_message(call.message.chat.id, "⚠️ Send download problem")
-        bot.register_next_step_handler(call.message, auto_fix_download)
+    try:
+        response = client.chat.completions.create(
+            model="gpt-5-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
+You are a Telegram bot support expert.
 
-    elif data == "broadcast":
-        bot.send_message(call.message.chat.id, "📢 Send broadcast issue")
-        bot.register_next_step_handler(call.message, auto_fix_broadcast)
+You help users fix:
+- Download errors
+- Broadcast issues
+- Token errors
+- Railway deployment issues
+- MongoDB issues
 
-    elif data == "system":
-        bot.send_message(call.message.chat.id, "⚙️ Send system error")
-        bot.register_next_step_handler(call.message, auto_fix_system)
+Always:
+- Give clear solutions
+- Be short and direct
+- If not sure → say "contact admin"
+"""
+                },
+                {
+                    "role": "user",
+                    "content": text
+                }
+            ]
+        )
+
+        reply = response.choices[0].message.content
+
+        bot.send_message(user_id, reply)
+
+        # haddii AI ku kalsooni yar (keyword)
+        if "contact admin" in reply.lower():
+            forward_to_admin(message)
+
+    except Exception as e:
+        print("AI ERROR:", e)
+        forward_to_admin(message)
 
 
 # ==============================
-# AUTO FIX
+# ADMIN FORWARD
 # ==============================
-def auto_fix_download(message):
-    text = (message.text or "").lower()
-
-    if "tiktok" in text:
-        bot.send_message(message.chat.id, "✅ Fix: TikTok link must be public")
-
-    elif "x" in text or "twitter" in text:
-        bot.send_message(message.chat.id, "✅ Fix: Use correct X link")
-
-    else:
-        forward_to_admin(message, "DOWNLOAD")
-
-
-def auto_fix_broadcast(message):
-    bot.send_message(
-        message.chat.id,
-        "✅ Fix:\n- Users exist\n- Token sax yahay\n- Restart bot"
-    )
-
-
-def auto_fix_system(message):
-    bot.send_message(
-        message.chat.id,
-        "✅ Railway Fix:\n1. Restart service\n2. Check logs\n3. Check MONGO_URI"
-    )
-
-
-# ==============================
-# FORWARD TO ADMIN
-# ==============================
-def forward_to_admin(message, problem_type):
+def forward_to_admin(message):
     try:
         user = message.from_user
 
-        text = f"""
-🚨 NEW SUPPORT REQUEST
+        bot.send_message(
+            ADMIN_ID,
+            f"""
+🚨 AI FAILED - SUPPORT
 
-👤 User: @{user.username}
-🆔 ID: {user.id}
-📌 Type: {problem_type}
+👤 @{user.username}
+🆔 {user.id}
 
-💬 Message:
-{message.text}
+💬 {message.text}
 """
+        )
 
-        bot.send_message(ADMIN_ID, text)
+        bot.send_message(message.chat.id, "📩 Sent to admin")
 
-        # haddii video / photo jiro
-        if message.video:
-            bot.send_video(ADMIN_ID, message.video.file_id)
-
-        if message.photo:
-            bot.send_photo(ADMIN_ID, message.photo[-1].file_id)
-
-        bot.send_message(message.chat.id, "✅ Sent to admin")
-
-    except Exception as e:
-        print("Forward error:", e)
-        bot.send_message(message.chat.id, "❌ Failed to send")
+    except:
+        bot.send_message(message.chat.id, "❌ Failed")
 
 
 # ==============================
 # RUN
 # ==============================
 def run():
-    print("🤖 Support bot running...")
+    print("🤖 AI Support bot running...")
     bot.infinity_polling(skip_pending=True)
