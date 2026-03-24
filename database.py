@@ -28,12 +28,14 @@ bots = db["bots"]
 channels = db["channels"]
 settings = db["settings"]
 downloads = db["downloads"]
+messages = db["messages"]   # 🔥 AI MEMORY
 
 # ==============================
-# INDEXES (🔥 PERFORMANCE)
+# INDEXES
 # ==============================
 users.create_index("user_id", unique=True)
 bots.create_index("token", unique=True)
+messages.create_index("user_id")
 
 # ==============================
 # USERS
@@ -41,16 +43,11 @@ bots.create_index("token", unique=True)
 def add_user(user_id):
     users.update_one(
         {"user_id": user_id},
-        {
-            "$setOnInsert": {
-                "joined": datetime.utcnow()
-            }
-        },
+        {"$setOnInsert": {"joined": datetime.utcnow()}},
         upsert=True
     )
 
 
-# SAVE USER + BOT
 def save_user_bot(user_id, bot_token):
     users.update_one(
         {"user_id": user_id},
@@ -75,10 +72,8 @@ def get_all_users_global():
     return [u.get("user_id") for u in users.find() if u.get("user_id")]
 
 
-# USERS GROUPED BY BOT
 def get_users_by_bot():
     data = {}
-
     for u in users.find():
         token = u.get("bot_token")
         uid = u.get("user_id")
@@ -86,15 +81,11 @@ def get_users_by_bot():
         if not token or not uid:
             continue
 
-        if token not in data:
-            data[token] = []
-
-        data[token].append(uid)
+        data.setdefault(token, []).append(uid)
 
     return data
 
 
-# USERS BY TOKEN (🔥 NEW)
 def get_users_by_token(token):
     return [u.get("user_id") for u in users.find({"bot_token": token})]
 
@@ -105,7 +96,7 @@ def get_users_by_token(token):
 def add_bot(user_id, token, username, platform):
     if not bots.find_one({"token": token}):
         bots.insert_one({
-            "user_id": user_id,  # 👈 OWNER
+            "user_id": user_id,
             "token": token,
             "username": username,
             "platform": platform,
@@ -132,7 +123,6 @@ def get_bot_by_token(token):
     return bots.find_one({"token": token})
 
 
-# 🔥 OWNER BY TOKEN (FIX CRASH)
 def get_owner_by_token(token):
     bot = bots.find_one({"token": token})
     return bot.get("user_id") if bot else None
@@ -174,7 +164,7 @@ def get_setting(key):
 
 
 # ==============================
-# DOWNLOAD TRACKING
+# DOWNLOADS
 # ==============================
 def add_download(platform):
     downloads.insert_one({
@@ -187,6 +177,11 @@ def get_download_count():
     return downloads.count_documents({})
 
 
+# 🔥 FIX (ERROR KAAGA)
+def get_total_downloads():
+    return downloads.count_documents({})
+
+
 def get_platform_stats():
     return list(downloads.aggregate([
         {"$group": {"_id": "$platform", "count": {"$sum": 1}}}
@@ -194,7 +189,32 @@ def get_platform_stats():
 
 
 # ==============================
-# HEALTH CHECK
+# AI MEMORY
+# ==============================
+def save_message(user_id, role, text):
+    messages.insert_one({
+        "user_id": user_id,
+        "role": role,  # user / assistant
+        "text": text,
+        "time": datetime.utcnow()
+    })
+
+
+def get_user_history(user_id, limit=10):
+    data = list(messages.find(
+        {"user_id": user_id}
+    ).sort("time", -1).limit(limit))
+
+    data.reverse()
+    return data
+
+
+def clear_history(user_id):
+    messages.delete_many({"user_id": user_id})
+
+
+# ==============================
+# HEALTH
 # ==============================
 def ping_db():
     try:
