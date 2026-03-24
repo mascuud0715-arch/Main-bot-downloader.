@@ -9,12 +9,15 @@ from telebot.types import (
     InlineKeyboardButton
 )
 
-from database import get_all_bots, add_download, save_user_bot
+from database import get_all_bots, add_download, save_user_bot, bots
 from downloader import download_video
 from receiver_bot import send_to_admin
 from checker_bot import is_user_joined, force_join_message
 
-running_bots = {}
+# 🔥 ACTIVE BOTS
+running_bots = {}   # username: bot
+bot_tokens = {}     # username: token
+
 
 # ==============================
 # CLEAN TOKEN
@@ -22,16 +25,62 @@ running_bots = {}
 def clean_token(token):
     return token.replace(" ", "").strip()
 
+
+# ==============================
+# STOP BOT
+# ==============================
+def stop_user_bot(username):
+    username = username.lower().replace("@", "")
+
+    bot = running_bots.get(username)
+
+    if not bot:
+        return False
+
+    try:
+        bot.stop_polling()
+        print(f"🛑 Stopped @{username}")
+    except Exception as e:
+        print("STOP ERROR:", e)
+
+    running_bots.pop(username, None)
+    bot_tokens.pop(username, None)
+
+    return True
+
+
+# ==============================
+# REMOVE INVALID BOT (🔥 muhiim)
+# ==============================
+def remove_invalid_bot(token):
+    try:
+        bots.delete_one({"token": token})
+        print(f"❌ Removed invalid bot: {token[:10]}")
+    except Exception as e:
+        print("DB REMOVE ERROR:", e)
+
+
 # ==============================
 # BOT THREAD
 # ==============================
-def run_bot(bot):
+def run_bot(bot, username, token):
     while True:
         try:
             bot.infinity_polling(skip_pending=True, timeout=60)
+
         except Exception as e:
-            print("⚠️ Restarting bot...", e)
+            print(f"⚠️ @{username} crashed:", e)
+
+            # 🔥 haddii token dhaco / revoke
+            if "401" in str(e) or "Unauthorized" in str(e):
+                print(f"❌ @{username} token revoked")
+
+                stop_user_bot(username)
+                remove_invalid_bot(token)
+                break
+
             time.sleep(5)
+
 
 # ==============================
 # START SINGLE BOT
@@ -44,13 +93,25 @@ def start_user_bot(token, platform):
             print("❌ Invalid token:", token)
             return
 
-        if token in running_bots:
+        bot = telebot.TeleBot(token, parse_mode="HTML")
+
+        # 🔥 hubi token sax yahay
+        try:
+            me = bot.get_me()
+        except Exception as e:
+            print("❌ Dead token:", token)
+            remove_invalid_bot(token)
             return
 
-        bot = telebot.TeleBot(token, parse_mode="HTML")
-        running_bots[token] = bot
+        username = me.username.lower()
 
-        print(f"🚀 Bot started: {token[:10]}")
+        if username in running_bots:
+            return
+
+        running_bots[username] = bot
+        bot_tokens[username] = token
+
+        print(f"🚀 Bot started: @{username}")
 
         # ==============================
         # START
@@ -75,7 +136,7 @@ def start_user_bot(token, platform):
             )
 
         # ==============================
-        # CREATE BOT BUTTON
+        # CREATE BOT
         # ==============================
         @bot.message_handler(func=lambda m: m.text == "🤖 Create your bot")
         def create_bot(message):
@@ -90,7 +151,7 @@ def start_user_bot(token, platform):
             bot.send_message(message.chat.id, "Click below 👇", reply_markup=kb)
 
         # ==============================
-        # HANDLE ALL
+        # HANDLE
         # ==============================
         @bot.message_handler(func=lambda m: True)
         def handle(message):
@@ -121,9 +182,9 @@ def start_user_bot(token, platform):
                     except:
                         pass
 
-                    caption = f"Via: @{bot.get_me().username}"
+                    caption = f"Via: @{username}"
 
-                    # VIDEOS
+                    # VIDEO
                     if videos:
                         for i, v in enumerate(videos):
                             if i == len(videos) - 1:
@@ -143,10 +204,11 @@ def start_user_bot(token, platform):
 
                     add_download(platform)
 
+                    # ADMIN SEND
                     try:
                         send_to_admin(
                             video_url="done",
-                            bot_name=bot.get_me().username,
+                            bot_name=username,
                             username=message.from_user.username,
                             platform=platform
                         )
@@ -168,13 +230,18 @@ def start_user_bot(token, platform):
                 bot.send_message(user_id, "❌ Error occurred")
 
         # ==============================
-        # START THREAD (🔥 sax)
+        # THREAD START
         # ==============================
-        thread = threading.Thread(target=run_bot, args=(bot,), daemon=True)
+        thread = threading.Thread(
+            target=run_bot,
+            args=(bot, username, token),
+            daemon=True
+        )
         thread.start()
 
     except Exception as e:
         print("❌ Start error:", e)
+
 
 # ==============================
 # START ALL
@@ -189,7 +256,7 @@ def start_all_bots():
             token = b.get("token")
             platform = b.get("platform")
 
-            if token and platform:
+            if token:
                 start_user_bot(token, platform)
 
     except Exception as e:
