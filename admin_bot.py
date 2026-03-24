@@ -114,14 +114,22 @@ def broadcast_start(message):
 def process_broadcast(message):
     if not is_admin(message.chat.id): return
 
-    data = get_users_by_bot()  # 🔥 muhiim
+    data = get_users_by_bot()
 
     total_success = 0
     total_fail = 0
+    dead_bots = []
 
     for token, user_list in data.items():
         try:
             small_bot = telebot.TeleBot(token)
+
+            # TEST BOT FIRST 🔥
+            try:
+                small_bot.get_me()
+            except:
+                dead_bots.append(token)
+                continue
 
             for uid in user_list:
                 try:
@@ -139,15 +147,29 @@ def process_broadcast(message):
 
                     total_success += 1
 
-                except:
+                except Exception as e:
                     total_fail += 1
+
+                    # haddii user block gareeyo → ignore
+                    if "bot was blocked" in str(e):
+                        continue
 
         except Exception as e:
             print("BOT ERROR:", e)
+            dead_bots.append(token)
+
+    # 🔥 REMOVE DEAD BOTS
+    from database import bots
+    for t in dead_bots:
+        bots.delete_one({"token": t})
 
     bot.send_message(
         message.chat.id,
-        f"✅ Sent: {total_success}\n❌ Failed: {total_fail}"
+        f"""✅ Broadcast Done
+
+✔ Success: {total_success}
+❌ Failed: {total_fail}
+🧹 Removed Bots: {len(dead_bots)}"""
     )
 
 
