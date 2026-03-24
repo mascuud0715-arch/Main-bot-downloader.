@@ -2,3 +2,4 @@ pyTelegramBotAPI
 pymongo
 requests
 yt_dlp
+openai
