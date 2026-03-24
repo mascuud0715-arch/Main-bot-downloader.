@@ -9,8 +9,14 @@ import main_bot
 import admin_bot
 import receiver_bot
 
-# USER BOTS MANAGER
-from user_bots_manager import start_all_bots
+# USER BOT SYSTEM
+from user_bots_manager import (
+    start_user_bot,
+    running_bots,
+    bot_tokens
+)
+
+from database import get_all_bots
 
 
 # ==============================
@@ -59,25 +65,63 @@ def run_receiver():
 
 
 # ==============================
-# USER BOTS (SMART LOADER)
+# 🔥 STOP REMOVED BOTS
+# ==============================
+def stop_removed_bots(db_tokens):
+    for username, bot in list(running_bots.items()):
+        token = bot_tokens.get(username)
+
+        # haddii token DB ku jirin → STOP
+        if token not in db_tokens:
+            try:
+                bot.stop_polling()
+                print(f"🛑 Stopped removed bot @{username}")
+            except Exception as e:
+                print("STOP ERROR:", e)
+
+            running_bots.pop(username, None)
+            bot_tokens.pop(username, None)
+
+
+# ==============================
+# USER BOTS SYSTEM (SMART)
 # ==============================
 def run_user_bots():
     print("🤖 Starting USER bots system...")
 
-    # 🔥 first load
-    try:
-        start_all_bots()
-    except Exception as e:
-        print("❌ Initial user bots error:", e)
+    loaded_tokens = set()
 
-    # 🔁 check new bots only
     while True:
         try:
-            start_all_bots()
+            all_bots = get_all_bots()
+
+            # 🔥 tokens DB
+            db_tokens = set()
+            for b in all_bots:
+                if b.get("token"):
+                    db_tokens.add(b.get("token"))
+
+            # 🔴 STOP removed bots
+            stop_removed_bots(db_tokens)
+
+            # 🟢 START new bots only
+            for b in all_bots:
+                token = b.get("token")
+                platform = b.get("platform")
+
+                if not token:
+                    continue
+
+                if token in loaded_tokens:
+                    continue
+
+                start_user_bot(token, platform)
+                loaded_tokens.add(token)
+
         except Exception as e:
             print("❌ User bots error:", e)
 
-        time.sleep(30)  # 🔥 muhiim (ha ka dhigin 10 sec)
+        time.sleep(30)
 
 
 # ==============================
