@@ -153,7 +153,10 @@ def start_user_bot(token, platform):
         # ==============================
         # HANDLE
         # ==============================
-        @bot.message_handler(func=lambda m: True)
+        # ==============================
+# HANDLE (SAX 100%)
+# ==============================
+@bot.message_handler(func=lambda m: True)
 def handle(message):
     user_id = message.chat.id
     url = message.text
@@ -177,6 +180,7 @@ def handle(message):
             videos = res.get("videos", [])
             images = res.get("images", [])
 
+            # delete loading msg
             try:
                 bot.delete_message(user_id, msg.message_id)
             except:
@@ -184,7 +188,9 @@ def handle(message):
 
             caption = f"Via: @{username}"
 
+            # ======================
             # VIDEO
+            # ======================
             if videos:
                 for i, v in enumerate(videos):
                     if i == len(videos) - 1:
@@ -192,7 +198,7 @@ def handle(message):
                     else:
                         bot.send_video(user_id, v)
 
-                # ADMIN SEND
+                # 🔥 ADMIN SEND
                 try:
                     send_to_admin(
                         video_url=videos[0],
@@ -203,7 +209,9 @@ def handle(message):
                 except Exception as e:
                     print("Receiver error:", e)
 
+            # ======================
             # IMAGES
+            # ======================
             elif images:
                 for i, img in enumerate(images):
                     if i == len(images) - 1:
@@ -215,7 +223,11 @@ def handle(message):
             add_download(platform)
 
         else:
-            bot.delete_message(user_id, msg.message_id)
+            try:
+                bot.delete_message(user_id, msg.message_id)
+            except:
+                pass
+
             bot.send_message(user_id, "❌ Download failed")
 
     except Exception as e:
