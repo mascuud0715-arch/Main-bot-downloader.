@@ -39,6 +39,29 @@ LANGS = {
 }
 
 # ==============================
+# AI FUNCTION (AUTO MODEL 🔥)
+# ==============================
+def ask_ai(messages):
+    models = [
+        "llama-3.1-8b-instant",
+        "gemma-7b-it",
+        "llama3-8b-8192"
+    ]
+
+    for m in models:
+        try:
+            res = client.chat.completions.create(
+                model=m,
+                messages=messages
+            )
+            return res.choices[0].message.content
+        except Exception as e:
+            print(f"{m} failed:", e)
+            continue
+
+    return "❌ AI temporarily down, try again later."
+
+# ==============================
 # START
 # ==============================
 @bot.message_handler(commands=['start'])
@@ -49,68 +72,93 @@ def start(message):
 
     bot.send_message(
         message.chat.id,
-        "🌍 <b>Welcome to FREE AI Support Bot</b>\n\n👇 Choose language:",
+        "🌍 <b>WELCOME TO AI SUPPORT BOT</b>\n\n"
+        "🤖 I can help you fix:\n"
+        "• Download problems\n"
+        "• Bot errors\n"
+        "• API issues\n\n"
+        "👇 Choose your language:",
         reply_markup=kb
     )
 
 # ==============================
-# LANGUAGE
+# LANGUAGE SELECT
 # ==============================
 @bot.callback_query_handler(func=lambda c: c.data in LANGS)
-def lang(call):
+def set_lang(call):
     user_id = call.message.chat.id
     user_lang[user_id] = LANGS[call.data]
 
     bot.edit_message_text(
-        f"✅ {LANGS[call.data]} selected\n💬 Ask anything!",
+        f"✅ <b>{LANGS[call.data]} selected</b>\n\n💬 Ask anything...",
         user_id,
         call.message.message_id
     )
 
 # ==============================
-# AI
+# AI CHAT
 # ==============================
 @bot.message_handler(func=lambda m: True)
 def ai(message):
     user_id = message.chat.id
 
     if user_id not in user_lang:
-        bot.send_message(user_id, "⚠️ Choose language first (/start)")
+        bot.send_message(user_id, "⚠️ Please choose language first (/start)")
         return
 
     try:
         bot.send_chat_action(user_id, "typing")
 
-        res = client.chat.completions.create(
-            model="llama-3.1-70b-versatile",
-            messages=[
-                {
-                    "role": "system",
-                    "content": f"Reply in {user_lang[user_id]}. Help user like support bot."
-                },
-                {
-                    "role": "user",
-                    "content": message.text
-                }
-            ]
-        )
+        messages = [
+            {
+                "role": "system",
+                "content": f"""
+You are a professional Telegram support bot.
 
-        reply = res.choices[0].message.content
+Language: {user_lang[user_id]}
+
+You help users fix:
+- Download errors
+- Token issues
+- Railway problems
+- Bot errors
+
+Rules:
+- Speak ONLY {user_lang[user_id]}
+- Be short and clear
+- Give solutions
+- If not solvable → say CONTACT ADMIN
+"""
+            },
+            {
+                "role": "user",
+                "content": message.text
+            }
+        ]
+
+        reply = ask_ai(messages)
 
         bot.send_message(user_id, reply)
 
-    except Exception as e:
-        print("GROQ ERROR:", e)
+        # haddii AI u baahato admin
+        if "CONTACT ADMIN" in reply.upper():
+            bot.send_message(
+                ADMIN_ID,
+                f"🚨 USER NEED HELP\n\nID: {user_id}\nMSG: {message.text}"
+            )
 
-        bot.send_message(user_id, f"❌ Error:\n{e}")
+    except Exception as e:
+        print("ERROR:", e)
+
+        bot.send_message(user_id, "❌ System error, admin notified")
 
         bot.send_message(
             ADMIN_ID,
-            f"🚨 ERROR\n\nUser: {user_id}\n\n{e}"
+            f"🚨 ERROR\nUser: {user_id}\n\n{e}"
         )
 
 # ==============================
 # RUN
 # ==============================
-print("🤖 GROQ BOT RUNNING...")
+print("🤖 AI SUPPORT BOT RUNNING...")
 bot.infinity_polling(skip_pending=True)
