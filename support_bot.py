@@ -1,9 +1,10 @@
 import os
 import telebot
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from telebot.types import ReplyKeyboardMarkup, KeyboardButton
 from openai import OpenAI
 
-from database import get_user_bots
+from database import get_user_bots, get_total_downloads
+from receiver_bot import send_to_admin
 
 # ==============================
 # ENV
@@ -12,15 +13,29 @@ BOT_TOKEN = os.getenv("SUPPORT_BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 
-if not BOT_TOKEN:
-    raise Exception("❌ SUPPORT_BOT_TOKEN missing")
-
-if not OPENAI_KEY:
-    raise Exception("❌ OPENAI_API_KEY missing")
-
-client = OpenAI(api_key=OPENAI_KEY)
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
+client = OpenAI(api_key=OPENAI_KEY)
 
+# ==============================
+# MEMORY
+# ==============================
+user_lang = {}
+
+# ==============================
+# LANGUAGES
+# ==============================
+LANGS = {
+    "🇸🇴 Somali": "Somali",
+    "🇬🇧 English": "English",
+    "🇸🇦 Arabic": "Arabic",
+    "🇪🇸 Spanish": "Spanish",
+    "🇫🇷 French": "French",
+    "🇩🇪 German": "German",
+    "🇮🇹 Italian": "Italian",
+    "🇹🇷 Turkish": "Turkish",
+    "🇮🇳 Hindi": "Hindi",
+    "🇨🇳 Chinese": "Chinese"
+}
 
 # ==============================
 # CHECK USER
@@ -37,29 +52,57 @@ def start(message):
     user_id = message.chat.id
 
     if not has_bot(user_id):
-        kb = InlineKeyboardMarkup()
-        kb.add(
-            InlineKeyboardButton(
-                "🤖 Create Bot",
-                url="https://t.me/Create_Our_own_bot"
-            )
-        )
-
         bot.send_message(
             user_id,
-            "❌ Go to @Create_Our_own_bot to connect a new Bot and start Bot System.",
-            reply_markup=kb
+            "❌ Go to @Create_Our_own_bot to connect a new Bot and start Bot System."
         )
         return
 
+    kb = ReplyKeyboardMarkup(resize_keyboard=True)
+    for l in LANGS.keys():
+        kb.add(KeyboardButton(l))
+
     bot.send_message(
         user_id,
-        "🤖 AI Support is ready\nAsk anything about your bot system 💬"
+        "🌍 Choose your language:",
+        reply_markup=kb
     )
 
 
 # ==============================
-# AI RESPONSE
+# LANGUAGE SELECT
+# ==============================
+@bot.message_handler(func=lambda m: m.text in LANGS)
+def set_language(message):
+    user_id = message.chat.id
+
+    lang = LANGS[message.text]
+    user_lang[user_id] = lang
+
+    bot.send_message(
+        user_id,
+        f"✅ Language set: {lang}\n\n💬 Ask anything..."
+    )
+
+
+# ==============================
+# STATS (ADMIN)
+# ==============================
+@bot.message_handler(commands=['stats'])
+def stats(message):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    total = get_total_downloads()
+
+    bot.send_message(
+        message.chat.id,
+        f"📊 TOTAL DOWNLOADS:\n{total}"
+    )
+
+
+# ==============================
+# AI SUPPORT
 # ==============================
 @bot.message_handler(func=lambda m: True)
 def ai_support(message):
@@ -69,30 +112,39 @@ def ai_support(message):
     if not has_bot(user_id):
         bot.send_message(
             user_id,
-            "❌ You must create a bot first:\n@Create_Our_own_bot"
+            "❌ Create bot first:\n@Create_Our_own_bot"
         )
         return
 
+    if user_id not in user_lang:
+        bot.send_message(user_id, "⚠️ Choose language first")
+        return
+
+    lang = user_lang[user_id]
+
     try:
+        bot.send_chat_action(user_id, "typing")
+
         response = client.chat.completions.create(
             model="gpt-5-mini",
             messages=[
                 {
                     "role": "system",
-                    "content": """
+                    "content": f"""
 You are a Telegram bot support expert.
 
-You help users fix:
+Language: {lang}
+
+You help fix:
 - Download errors
 - Broadcast issues
 - Token errors
-- Railway deployment issues
-- MongoDB issues
+- Railway errors
 
-Always:
-- Give clear solutions
-- Be short and direct
-- If not sure → say "contact admin"
+Rules:
+- Speak ONLY {lang}
+- Give short fixes
+- If not sure → say "CONTACT ADMIN"
 """
                 },
                 {
@@ -104,28 +156,37 @@ Always:
 
         reply = response.choices[0].message.content
 
+        if not reply:
+            bot.send_message(user_id, "❌ No response")
+            return
+
         bot.send_message(user_id, reply)
 
-        # haddii AI ku kalsooni yar (keyword)
-        if "contact admin" in reply.lower():
-            forward_to_admin(message)
+        if "CONTACT ADMIN" in reply.upper():
+            forward_admin(message)
 
     except Exception as e:
         print("AI ERROR:", e)
-        forward_to_admin(message)
+
+        bot.send_message(
+            user_id,
+            "❌ Error → sent to admin"
+        )
+
+        forward_admin(message)
 
 
 # ==============================
 # ADMIN FORWARD
 # ==============================
-def forward_to_admin(message):
+def forward_admin(message):
     try:
         user = message.from_user
 
         bot.send_message(
             ADMIN_ID,
             f"""
-🚨 AI FAILED - SUPPORT
+🚨 SUPPORT ISSUE
 
 👤 @{user.username}
 🆔 {user.id}
@@ -133,16 +194,13 @@ def forward_to_admin(message):
 💬 {message.text}
 """
         )
-
-        bot.send_message(message.chat.id, "📩 Sent to admin")
-
     except:
-        bot.send_message(message.chat.id, "❌ Failed")
+        pass
 
 
 # ==============================
 # RUN
 # ==============================
 def run():
-    print("🤖 AI Support bot running...")
+    print("🤖 AI SUPPORT BOT RUNNING...")
     bot.infinity_polling(skip_pending=True)
