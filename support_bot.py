@@ -200,4 +200,3 @@ Language: {user_lang[uid]}
 # RUN
 # ==============================
 print("🤖 PROFESSIONAL SUPPORT BOT RUNNING...")
-bot.infinity_polling(skip_pending=True)
