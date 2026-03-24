@@ -32,26 +32,6 @@ LANGS = {
 }
 
 # ==============================
-# AI FUNCTION (SMART)
-# ==============================
-def ask_ai(messages):
-    models = [
-        "llama-3.3-70b-versatile"
-    ]
-
-    for m in models:
-        try:
-            res = client.chat.completions.create(
-                model=m,
-                messages=messages
-            )
-            return res.choices[0].message.content
-        except:
-            continue
-
-    return "❌ AI down"
-
-# ==============================
 # START
 # ==============================
 @bot.message_handler(commands=['start'])
@@ -59,17 +39,26 @@ def start(message):
     uid = message.chat.id
     users.add(uid)
 
-    kb = InlineKeyboardMarkup()
+    kb = InlineKeyboardMarkup(row_width=2)
     for l in LANGS:
         kb.add(InlineKeyboardButton(l, callback_data=l))
 
-    bot.send_message(uid, "🌍 Choose language:", reply_markup=kb)
+    bot.send_message(
+        uid,
+        "🌍 <b>WELCOME TO SUPPORT BOT</b>\n\n"
+        "🤖 Waxaan kaa caawin karaa:\n"
+        "• Sida bot loo sameeyo\n"
+        "• Errors (token / hosting)\n"
+        "• Downloader bots\n\n"
+        "👇 Dooro luqad:",
+        reply_markup=kb
+    )
 
 # ==============================
 # LANGUAGE
 # ==============================
 @bot.callback_query_handler(func=lambda c: c.data in LANGS)
-def lang(call):
+def set_lang(call):
     uid = call.message.chat.id
     user_lang[uid] = LANGS[call.data]
 
@@ -80,65 +69,67 @@ def lang(call):
     )
 
 # ==============================
-# ADMIN PANEL
+# ADMIN PANEL BUTTON
 # ==============================
 @bot.message_handler(commands=['admin'])
-def admin(message):
+def admin_panel(message):
     if message.from_user.id != ADMIN_ID:
         return
 
-    kb = InlineKeyboardMarkup()
+    kb = InlineKeyboardMarkup(row_width=2)
     kb.add(
-        InlineKeyboardButton("📢 Broadcast", callback_data="bc"),
-        InlineKeyboardButton("👥 Users", callback_data="users")
+        InlineKeyboardButton("📢 Broadcast", callback_data="broadcast"),
+        InlineKeyboardButton("👥 Users", callback_data="users"),
+        InlineKeyboardButton("📊 Stats", callback_data="stats"),
+        InlineKeyboardButton("❌ Close", callback_data="close")
     )
 
-    bot.send_message(message.chat.id, "👑 ADMIN PANEL", reply_markup=kb)
+    bot.send_message(message.chat.id, "👑 <b>ADMIN PANEL</b>", reply_markup=kb)
 
 # ==============================
-# ADMIN ACTIONS
+# ADMIN BUTTON ACTIONS
 # ==============================
-@bot.callback_query_handler(func=lambda c: c.data in ["bc", "users"])
+@bot.callback_query_handler(func=lambda c: c.data in ["broadcast","users","stats","close"])
 def admin_actions(call):
     if call.from_user.id != ADMIN_ID:
         return
 
     if call.data == "users":
-        bot.send_message(call.message.chat.id, f"👥 Users: {len(users)}")
+        bot.send_message(call.message.chat.id, f"👥 Total Users: {len(users)}")
 
-    if call.data == "bc":
-        msg = bot.send_message(call.message.chat.id, "✍️ Send broadcast:")
-        bot.register_next_step_handler(msg, send_bc)
+    elif call.data == "stats":
+        bot.send_message(call.message.chat.id, "📊 Bot running нормально ✅")
 
-def send_bc(message):
+    elif call.data == "broadcast":
+        msg = bot.send_message(call.message.chat.id, "✍️ Send message to broadcast:")
+        bot.register_next_step_handler(msg, send_broadcast)
+
+    elif call.data == "close":
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+
+def send_broadcast(message):
     if message.from_user.id != ADMIN_ID:
         return
 
     for u in users:
         try:
-            bot.send_message(u, message.text)
+            bot.send_message(u, f"📢 {message.text}")
         except:
             pass
 
 # ==============================
-# VOICE (Speech to text)
+# VOICE
 # ==============================
 @bot.message_handler(content_types=['voice'])
-def voice_handler(message):
-    file = bot.get_file(message.voice.file_id)
-    downloaded = bot.download_file(file.file_path)
-
-    with open("voice.ogg", "wb") as f:
-        f.write(downloaded)
-
-    bot.send_message(message.chat.id, "🎤 Voice received (processing...)")
+def voice(message):
+    bot.send_message(message.chat.id, "🎤 Voice received (processing soon)")
 
 # ==============================
-# PHOTO (basic)
+# PHOTO
 # ==============================
 @bot.message_handler(content_types=['photo'])
-def photo_handler(message):
-    bot.send_message(message.chat.id, "🖼 Image received (feature ready soon)")
+def photo(message):
+    bot.send_message(message.chat.id, "🖼 Image received (AI feature coming)")
 
 # ==============================
 # AI CHAT
@@ -148,7 +139,7 @@ def ai(message):
     uid = message.chat.id
 
     if uid not in user_lang:
-        bot.send_message(uid, "⚠️ Choose language first (/start)")
+        bot.send_message(uid, "⚠️ Dooro luqad marka hore (/start)")
         return
 
     try:
@@ -158,13 +149,19 @@ def ai(message):
             {
                 "role": "system",
                 "content": f"""
-You are a Telegram SUPPORT BOT.
+You are a Telegram BOT SUPPORT EXPERT.
 
-IMPORTANT RULES:
-- Talk ONLY about bots, APIs, Telegram, errors
-- If question is not about bots → say: "I only support bot issues"
-- Reply in {user_lang[uid]}
-- Be short and helpful
+STRICT RULES:
+- ONLY talk about bots, Telegram, APIs, errors
+- Always guide user to @Create_Our_own_bot to create bots
+- Explain:
+  • How to create bot using BotFather
+  • How to get TOKEN
+  • How to deploy (Railway)
+- If not bot-related → say: "I only support bot issues"
+
+Language: {user_lang[uid]}
+Keep answers short and clear.
 """
             },
             {
@@ -173,10 +170,15 @@ IMPORTANT RULES:
             }
         ]
 
-        reply = ask_ai(messages)
+        res = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=messages
+        )
 
-        # ADD SIGNATURE 🔥
-        reply = reply + "\n\n— Created: @scholes1"
+        reply = res.choices[0].message.content
+
+        # SIGNATURE
+        reply += "\n\n— Created: scholes1"
 
         bot.send_message(uid, reply)
 
@@ -191,5 +193,5 @@ IMPORTANT RULES:
 # ==============================
 # RUN
 # ==============================
-print("🤖 PRO MAX BOT RUNNING...")
+print("🤖 SUPPORT BOT PRO RUNNING...")
 bot.infinity_polling(skip_pending=True)
