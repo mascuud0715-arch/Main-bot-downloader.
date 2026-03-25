@@ -15,13 +15,17 @@ from telebot.types import (
 # ==============================
 TOKEN = os.getenv("ADMIN_MASTER_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
+BOT_USERNAME = os.getenv("BOT_USERNAME")  # without @
 
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 
 # ==============================
-# MEMORY
+# STORAGE
 # ==============================
 user_step = {}
+users = set()
+groups = set()
+channels = set()
 scheduled_posts = []
 
 # ==============================
@@ -31,15 +35,15 @@ def admin_menu(chat_id):
     kb = ReplyKeyboardMarkup(resize_keyboard=True)
     kb.add(
         KeyboardButton("📢 Broadcast"),
-        KeyboardButton("📡 Post All Channels")
+        KeyboardButton("📡 Post Channels")
     )
     kb.add(
-        KeyboardButton("👥 Post All Groups"),
-        KeyboardButton("🎯 Single Channel Post")
+        KeyboardButton("👥 Post Groups"),
+        KeyboardButton("🎯 Single Channel")
     )
     kb.add(
-        KeyboardButton("📊 View Channels"),
-        KeyboardButton("📊 View Groups")
+        KeyboardButton("⏰ Schedule"),
+        KeyboardButton("📊 Stats")
     )
 
     bot.send_message(chat_id, "👑 <b>ADMIN PANEL</b>", reply_markup=kb)
@@ -50,52 +54,96 @@ def admin_menu(chat_id):
 @bot.message_handler(commands=['start'])
 def start(message):
     if message.chat.id != ADMIN_ID:
-        return bot.send_message(message.chat.id, "❌ Admin only")
+        # USER VIEW (ADD BUTTONS)
+        kb = InlineKeyboardMarkup()
+        kb.add(
+            InlineKeyboardButton(
+                "➕ Add me to Group",
+                url=f"https://t.me/{BOT_USERNAME}?startgroup=true"
+            )
+        )
+
+        bot.send_message(
+            message.chat.id,
+            "🤖 Add me to your group to use downloader 🔥",
+            reply_markup=kb
+        )
+        return
 
     admin_menu(message.chat.id)
+
+# ==============================
+# AUTO DETECT GROUPS / CHANNELS
+# ==============================
+@bot.message_handler(content_types=['new_chat_members'])
+def added(message):
+    if message.chat.type in ["group", "supergroup"]:
+        groups.add(message.chat.id)
+
+# channels
+@bot.channel_post_handler(func=lambda m: True)
+def channel_detect(message):
+    channels.add(message.chat.id)
+
+# save users
+@bot.message_handler(func=lambda m: True)
+def save_user(message):
+    if message.chat.type == "private":
+        users.add(message.chat.id)
 
 # ==============================
 # BROADCAST
 # ==============================
 @bot.message_handler(func=lambda m: m.text == "📢 Broadcast")
-def broadcast(message):
-    user_step[message.chat.id] = "broadcast"
-    bot.send_message(message.chat.id, "✉️ Send message to broadcast:")
+def bc(message):
+    user_step[message.chat.id] = "bc"
+    bot.send_message(message.chat.id, "✉️ Send message:")
 
 # ==============================
-# POST ALL CHANNELS
+# POST CHANNELS
 # ==============================
-@bot.message_handler(func=lambda m: m.text == "📡 Post All Channels")
-def post_channels(message):
-    user_step[message.chat.id] = "post_channels"
-    bot.send_message(message.chat.id, "📤 Send post (text/photo/video):")
+@bot.message_handler(func=lambda m: m.text == "📡 Post Channels")
+def pc(message):
+    user_step[message.chat.id] = "pc"
+    bot.send_message(message.chat.id, "📤 Send post:")
 
 # ==============================
-# POST ALL GROUPS
+# POST GROUPS
 # ==============================
-@bot.message_handler(func=lambda m: m.text == "👥 Post All Groups")
-def post_groups(message):
-    user_step[message.chat.id] = "post_groups"
-    bot.send_message(message.chat.id, "📤 Send post for groups:")
+@bot.message_handler(func=lambda m: m.text == "👥 Post Groups")
+def pg(message):
+    user_step[message.chat.id] = "pg"
+    bot.send_message(message.chat.id, "📤 Send post:")
 
 # ==============================
 # SINGLE CHANNEL
 # ==============================
-@bot.message_handler(func=lambda m: m.text == "🎯 Single Channel Post")
-def single_channel(message):
-    user_step[message.chat.id] = "single_channel"
-    bot.send_message(message.chat.id, "📥 Send channel username (e.g @channel):")
+@bot.message_handler(func=lambda m: m.text == "🎯 Single Channel")
+def sc(message):
+    user_step[message.chat.id] = "sc"
+    bot.send_message(message.chat.id, "📥 Send @channel:")
 
 # ==============================
-# VIEW CHANNELS / GROUPS
+# SCHEDULE
 # ==============================
-@bot.message_handler(func=lambda m: m.text == "📊 View Channels")
-def view_channels(message):
-    bot.send_message(message.chat.id, "📡 Channels list feature (connect DB here)")
+@bot.message_handler(func=lambda m: m.text == "⏰ Schedule")
+def schedule(message):
+    user_step[message.chat.id] = "time"
+    bot.send_message(message.chat.id, "⏰ Send time HH:MM")
 
-@bot.message_handler(func=lambda m: m.text == "📊 View Groups")
-def view_groups(message):
-    bot.send_message(message.chat.id, "👥 Groups list feature (connect DB here)")
+# ==============================
+# STATS
+# ==============================
+@bot.message_handler(func=lambda m: m.text == "📊 Stats")
+def stats(message):
+    bot.send_message(
+        message.chat.id,
+        f"""📊 Stats
+
+Users: {len(users)}
+Groups: {len(groups)}
+Channels: {len(channels)}"""
+    )
 
 # ==============================
 # HANDLE
@@ -107,95 +155,87 @@ def handle(message):
 
     step = user_step.get(message.chat.id)
 
-    # ======================
     # BROADCAST
-    # ======================
-    if step == "broadcast":
-        text = message.text
-
-        # 👉 halkan ku dar DB users
-        users = []  # get from DB
-
+    if step == "bc":
         for u in users:
-            try:
-                bot.send_message(u, text)
-            except:
-                pass
+            send_any(u, message)
 
-        bot.send_message(message.chat.id, "✅ Broadcast sent")
+        bot.send_message(message.chat.id, "✅ Done")
         user_step[message.chat.id] = None
         admin_menu(message.chat.id)
 
-    # ======================
-    # POST ALL CHANNELS
-    # ======================
-    elif step == "post_channels":
-        channels = []  # 👉 kasoo qaad DB
-
+    # CHANNELS
+    elif step == "pc":
         for ch in channels:
-            try:
-                if message.photo:
-                    bot.send_photo(ch, message.photo[-1].file_id, caption=message.caption)
-                elif message.video:
-                    bot.send_video(ch, message.video.file_id, caption=message.caption)
-                else:
-                    bot.send_message(ch, message.text)
-            except:
-                pass
+            send_any(ch, message)
 
-        bot.send_message(message.chat.id, "✅ Posted to all channels")
+        bot.send_message(message.chat.id, "✅ Channels done")
         user_step[message.chat.id] = None
         admin_menu(message.chat.id)
 
-    # ======================
-    # POST ALL GROUPS
-    # ======================
-    elif step == "post_groups":
-        groups = []  # 👉 kasoo qaad DB
-
+    # GROUPS
+    elif step == "pg":
         for g in groups:
-            try:
-                bot.send_message(g, message.text)
-            except:
-                pass
+            send_any(g, message)
 
-        bot.send_message(message.chat.id, "✅ Posted to all groups")
+        bot.send_message(message.chat.id, "✅ Groups done")
         user_step[message.chat.id] = None
         admin_menu(message.chat.id)
 
-    # ======================
-    # SINGLE CHANNEL STEP 1
-    # ======================
-    elif step == "single_channel":
-        user_step[message.chat.id] = {
-            "channel": message.text
-        }
-        bot.send_message(message.chat.id, "📤 Send content now:")
+    # SINGLE STEP 1
+    elif step == "sc":
+        user_step[message.chat.id] = {"channel": message.text}
+        bot.send_message(message.chat.id, "📤 Send content:")
 
-    # ======================
-    # SINGLE CHANNEL STEP 2
-    # ======================
-    elif isinstance(step, dict):
-        channel = step["channel"]
+    # SINGLE STEP 2
+    elif isinstance(step, dict) and "channel" in step:
+        send_any(step["channel"], message)
 
-        try:
-            if message.photo:
-                bot.send_photo(channel, message.photo[-1].file_id, caption=message.caption)
-            elif message.video:
-                bot.send_video(channel, message.video.file_id, caption=message.caption)
-            else:
-                bot.send_message(channel, message.text)
+        bot.send_message(message.chat.id, "✅ Sent")
+        user_step[message.chat.id] = None
+        admin_menu(message.chat.id)
 
-            bot.send_message(message.chat.id, "✅ Posted successfully")
+    # TIME
+    elif step == "time":
+        user_step[message.chat.id] = {"time": message.text}
+        bot.send_message(message.chat.id, "📤 Send content:")
 
-        except Exception as e:
-            bot.send_message(message.chat.id, f"❌ Error: {e}")
+    # SAVE SCHEDULE
+    elif isinstance(step, dict) and "time" in step:
+        scheduled_posts.append({
+            "time": step["time"],
+            "message": message
+        })
 
+        bot.send_message(message.chat.id, "✅ Scheduled")
         user_step[message.chat.id] = None
         admin_menu(message.chat.id)
 
 # ==============================
-# SCHEDULER (AUTO POST)
+# SEND FUNCTION
+# ==============================
+def send_any(chat_id, message):
+    kb = InlineKeyboardMarkup()
+    kb.add(
+        InlineKeyboardButton(
+            "➕ Add me to Group",
+            url=f"https://t.me/{BOT_USERNAME}?startgroup=true"
+        )
+    )
+
+    if message.photo:
+        bot.send_photo(chat_id, message.photo[-1].file_id,
+                       caption=message.caption, reply_markup=kb)
+
+    elif message.video:
+        bot.send_video(chat_id, message.video.file_id,
+                       caption=message.caption, reply_markup=kb)
+
+    else:
+        bot.send_message(chat_id, message.text, reply_markup=kb)
+
+# ==============================
+# SCHEDULER
 # ==============================
 def scheduler():
     while True:
@@ -203,11 +243,11 @@ def scheduler():
 
         for post in scheduled_posts:
             if post["time"] == now and not post.get("sent"):
-                try:
-                    bot.send_message(post["chat_id"], post["text"])
-                    post["sent"] = True
-                except:
-                    pass
+
+                for u in users:
+                    send_any(u, post["message"])
+
+                post["sent"] = True
 
         time.sleep(30)
 
