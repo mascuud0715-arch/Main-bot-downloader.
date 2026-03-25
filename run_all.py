@@ -101,6 +101,37 @@ def stop_removed_bots(db_tokens):
             running_bots.pop(username, None)
             bot_tokens.pop(username, None)
 
+# ==============================
+# 🔥 MANUAL RESTART ALL BOTS
+# ==============================
+def start_all_bots():
+    print("🔁 Manual restart started...")
+
+    try:
+        all_bots = get_all_bots()
+
+        for b in all_bots:
+            token = b.get("token")
+            platform = b.get("platform")
+
+            if not token:
+                continue
+
+            # haddii hore u socdo skip
+            if token in bot_tokens.values():
+                continue
+
+            print(f"♻️ Restarting bot: {token[:10]}...")
+
+            threading.Thread(
+                target=start_user_bot,
+                args=(token, platform),
+                daemon=True
+            ).start()
+
+    except Exception as e:
+        print("❌ Restart error:", e)
+
 
 # ==============================
 # USER BOTS SYSTEM (SMART)
