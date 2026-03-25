@@ -217,4 +217,3 @@ threading.Thread(target=scheduler, daemon=True).start()
 # RUN
 # ==============================
 print("👑 ADMIN MASTER BOT RUNNING...")
-bot.infinity_polling(skip_pending=True)
