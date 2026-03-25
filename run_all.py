@@ -9,6 +9,7 @@ import main_bot
 import admin_bot
 import receiver_bot
 import support_bot
+import admin_master_bot
 
 # USER BOT SYSTEM
 from user_bots_manager import (
@@ -71,6 +72,15 @@ def run_support():
     safe_run(
         "SUPPORT BOT",
         lambda: support_bot.bot.infinity_polling(skip_pending=True)
+    )
+
+# ==============================
+# Run admin
+# ==============================
+def run_admin_master():
+    safe_run(
+        "ADMIN MASTER BOT",
+        lambda: admin_master_bot.bot.infinity_polling(skip_pending=True)
     )
 
 # ==============================
@@ -149,8 +159,10 @@ if __name__ == "__main__":
     t3 = threading.Thread(target=run_receiver, daemon=True)
     t4 = threading.Thread(target=run_user_bots, daemon=True)
     t5 = threading.Thread(target=run_support, daemon=True)
+    t6 = threading.Thread(target=run_admin_master, daemon=True)
+    
 
-    threads.extend([t1, t2, t3, t4, t5])
+    threads.extend([t1, t2, t3, t4, t5, t6])
 
     for t in threads:
         t.start()
