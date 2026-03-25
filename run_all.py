@@ -98,22 +98,18 @@ def stop_removed_bots(db_tokens):
 def run_user_bots():
     print("🤖 Starting USER bots system...")
 
-    loaded_tokens = set()
-
     while True:
         try:
             all_bots = get_all_bots()
 
-            # 🔥 tokens DB
             db_tokens = set()
             for b in all_bots:
                 if b.get("token"):
                     db_tokens.add(b.get("token"))
 
-            # 🔴 STOP removed bots
+            # STOP removed
             stop_removed_bots(db_tokens)
 
-            # 🟢 START new bots only
             for b in all_bots:
                 token = b.get("token")
                 platform = b.get("platform")
@@ -121,16 +117,23 @@ def run_user_bots():
                 if not token:
                     continue
 
-                if token in loaded_tokens:
+                # ✅ haddii hore u socdo skip
+                if token in bot_tokens.values():
                     continue
 
-                start_user_bot(token, platform)
-                loaded_tokens.add(token)
+                print(f"🟢 Starting NEW BOT: {token[:10]}...")
+
+                # 🔥 THREAD muhiim ah
+                threading.Thread(
+                    target=start_user_bot,
+                    args=(token, platform),
+                    daemon=True
+                ).start()
 
         except Exception as e:
             print("❌ User bots error:", e)
 
-        time.sleep(30)
+        time.sleep(15)
 
 
 # ==============================
