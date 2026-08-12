@@ -10,8 +10,7 @@ bot = telebot.TeleBot(MAIN_BOT_TOKEN)
 # CHANNELS
 # ==============================
 CHANNELS = [
-    "@systemdownloadernews",
-    "@systemfor"
+    "@downloadermainbotnews"
 ]
 
 # ==============================
